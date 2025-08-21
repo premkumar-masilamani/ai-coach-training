@@ -15,6 +15,18 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
+def format_timestamp(seconds: float) -> str:
+    """Convert seconds to HH:MM:SS,mmm format."""
+    milliseconds = round(seconds * 1000)
+    hours = milliseconds // 3600000
+    milliseconds %= 3600000
+    minutes = milliseconds // 60000
+    milliseconds %= 60000
+    seconds = milliseconds // 1000
+    milliseconds %= 1000
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
+
+
 def load_transcription_model():
     # Define model path structure
     model_repo = "guillaumekln/faster-whisper-medium"
@@ -66,7 +78,12 @@ def transcribe(model: WhisperModel, audio_file: Path, transcript_file: Path):
 
     try:
         segments, _ = model.transcribe(str(audio_file))
-        full_text = "\n".join(segment.text for segment in segments)
+
+        lines = [
+            f"{format_timestamp(s.start)} --> {format_timestamp(s.end)}\n{s.text.strip()}"
+            for s in segments
+        ]
+        full_text = "\n\n".join(lines)
 
     except Exception as e:
         logging.error(f"Failed to transcribe {audio_file}: {e}")
