@@ -2,8 +2,8 @@ import logging
 import time
 import argparse
 import sys
+import os
 from pathlib import Path
-import torch
 from faster_whisper import WhisperModel
 from huggingface_hub import snapshot_download
 
@@ -57,13 +57,16 @@ def load_transcription_model():
 
     start_load = time.time()
     try:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        compute_type = "float16" if torch.cuda.is_available() else "float32"
-        
-        logging.info(f"Loading faster-whisper model from '{model_path}' on device '{device}' with compute_type '{compute_type}'")
-        
-        model = WhisperModel(str(model_path), device=device, compute_type=compute_type)
-
+        cpu_count = os.cpu_count() or 1
+        logging.info(
+            f"Loading faster-whisper model from '{model_path}' "
+            f"with cpu_threads '{cpu_count}', and num_workers '{cpu_count}'"
+        )
+        model = WhisperModel(
+            str(model_path),
+            cpu_threads=cpu_count,
+            num_workers=cpu_count,
+        )
     except Exception as e:
         logging.error(f"Failed to load model from {model_path}: {e}")
         sys.exit(1)
@@ -78,13 +81,11 @@ def transcribe(model: WhisperModel, audio_file: Path, transcript_file: Path):
 
     try:
         segments, _ = model.transcribe(str(audio_file))
-
         lines = [
             f"{format_timestamp(s.start)} --> {format_timestamp(s.end)}\n{s.text.strip()}"
             for s in segments
         ]
         full_text = "\n\n".join(lines)
-
     except Exception as e:
         logging.error(f"Failed to transcribe {audio_file}: {e}")
         return
