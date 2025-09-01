@@ -13,4 +13,4 @@ show:
 
 .PHONY: run
 run:
-	python3 transcribe.py -v -i $(INPUT_DIR)
+	python3 main.py -v -i $(INPUT_DIR)
