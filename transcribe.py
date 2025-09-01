@@ -2,9 +2,11 @@ import logging
 import time
 import argparse
 import sys
+import os
 from pathlib import Path
 import torch
 from faster_whisper import WhisperModel
+from pyannote.audio import Pipeline
 from huggingface_hub import snapshot_download
 
 # --- Configure Root Logger ---
@@ -72,25 +74,107 @@ def load_transcription_model():
     return model
 
 
-def transcribe(model: WhisperModel, audio_file: Path, transcript_file: Path):
-    logging.info(f"Transcribing: {audio_file}")
+def diarize_speakers(audio_file: Path, hf_token: str):
+    logging.info("Performing speaker diarization...")
+    start_diarize = time.time()
+    try:
+        diarization_pipeline = Pipeline.from_pretrained(
+            "pyannote/speaker-diarization-3.1",
+            use_auth_token=hf_token
+        )
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        diarization_pipeline.to(torch.device(device))
+        diarization = diarization_pipeline(str(audio_file))
+        logging.info(f"Diarization completed in {time.time() - start_diarize:.2f} seconds.")
+        return diarization
+    except Exception as e:
+        logging.error(f"Failed to perform diarization: {e}")
+        logging.error("Please ensure you have a valid Hugging Face token and have accepted the user agreement for the pyannote/speaker-diarization-3.1 model.")
+        sys.exit(1)
+
+
+class SpeakerAligner:
+    def align(self, transcription_segments, diarization):
+        aligned_transcriptions = []
+
+        for segment in transcription_segments:
+            for word in segment.words:
+                word_start = word.start
+                word_end = word.end
+
+                best_match = self.find_best_match(diarization, word_start, word_end)
+                if best_match:
+                    speaker = best_match[2]
+                    aligned_transcriptions.append({
+                        "speaker": speaker,
+                        "start": word_start,
+                        "end": word_end,
+                        "text": word.word
+                    })
+        return aligned_transcriptions
+
+    def find_best_match(self, diarization, start_time, end_time):
+        best_match = None
+        max_intersection = 0
+
+        for turn, _, speaker in diarization.itertracks(yield_label=True):
+            intersection_start = max(start_time, turn.start)
+            intersection_end = min(end_time, turn.end)
+            intersection_length = intersection_end - intersection_start
+
+            if intersection_length > max_intersection:
+                max_intersection = intersection_length
+                best_match = (turn.start, turn.end, speaker)
+
+        return best_match
+
+    def merge_consecutive_segments(self, segments):
+        if not segments:
+            return []
+
+        merged = []
+        current_segment = segments[0]
+
+        for i in range(1, len(segments)):
+            next_segment = segments[i]
+            if next_segment["speaker"] == current_segment["speaker"] and (next_segment["start"] - current_segment["end"] < 0.5):
+                current_segment["end"] = next_segment["end"]
+                current_segment["text"] += "" + next_segment["text"]
+            else:
+                merged.append(current_segment)
+                current_segment = next_segment
+
+        merged.append(current_segment)
+        return merged
+
+
+def transcribe_and_align(model: WhisperModel, audio_file: Path, transcript_file: Path, diarization):
+    logging.info(f"Transcribing and aligning: {audio_file}")
     start_transcribe = time.time()
 
     try:
-        segments, _ = model.transcribe(str(audio_file))
+        segments, _ = model.transcribe(str(audio_file), word_timestamps=True)
 
-        lines = [
-            f"{format_timestamp(s.start)} --> {format_timestamp(s.end)}\n{s.text.strip()}"
-            for s in segments
-        ]
-        full_text = "\n\n".join(lines)
+        aligner = SpeakerAligner()
+        aligned_segments = aligner.align(segments, diarization)
+        merged_segments = aligner.merge_consecutive_segments(aligned_segments)
+
+        output_lines = []
+        for segment in merged_segments:
+            start_time = format_timestamp(segment['start'])
+            end_time = format_timestamp(segment['end'])
+            speaker = segment['speaker']
+            text = segment['text'].strip()
+            output_lines.append(f"[{start_time} --> {end_time}] {speaker}: {text}")
+
+        full_text = "\n\n".join(output_lines)
 
     except Exception as e:
-        logging.error(f"Failed to transcribe {audio_file}: {e}")
+        logging.error(f"Failed to transcribe and align {audio_file}: {e}")
         return
 
     logging.info(
-        f"Transcription completed in {time.time() - start_transcribe:.2f} seconds."
+        f"Transcription and alignment completed in {time.time() - start_transcribe:.2f} seconds."
     )
 
     with open(transcript_file, "w", encoding="utf-8") as f:
@@ -101,7 +185,7 @@ def transcribe(model: WhisperModel, audio_file: Path, transcript_file: Path):
 def main():
     # --- Parse Arguments ---
     parser = argparse.ArgumentParser(
-        description="Batch transcribe audio files using faster-whisper."
+        description="Batch transcribe audio files with speaker diarization."
     )
     parser.add_argument(
         "-i",
@@ -109,6 +193,11 @@ def main():
         required=True,
         type=Path,
         help="Directory containing audio files",
+    )
+    parser.add_argument(
+        "--hf-token",
+        type=str,
+        help="Hugging Face authentication token for pyannote.audio. Can also be set via HUGGING_FACE_TOKEN environment variable.",
     )
     parser.add_argument(
         "-v",
@@ -125,6 +214,12 @@ def main():
         logging.debug("Verbose logging enabled.")
     else:
         logger.setLevel(logging.INFO)
+
+    # --- Get Hugging Face Token ---
+    hf_token = args.hf_token or os.environ.get("HUGGING_FACE_TOKEN")
+    if not hf_token:
+        logging.error("Hugging Face token not provided. Please pass it using the --hf-token argument or set the HUGGING_FACE_TOKEN environment variable.")
+        sys.exit(1)
 
     input_dir: Path = args.input_dir
 
@@ -150,10 +245,12 @@ def main():
         logging.info(f"No audio files to transcribe in {input_dir}")
         sys.exit(0)
 
-    # --- Load and Run Transcriber ---
-    model = load_transcription_model()
+    # --- Load Models and Run Transcription ---
+    transcription_model = load_transcription_model()
+
     for audio_file, transcript_file in pending_files:
-        transcribe(model, audio_file, transcript_file)
+        diarization = diarize_speakers(audio_file, hf_token)
+        transcribe_and_align(transcription_model, audio_file, transcript_file, diarization)
 
 
 if __name__ == "__main__":
