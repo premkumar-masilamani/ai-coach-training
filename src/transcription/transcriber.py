@@ -1,25 +1,29 @@
+import json
 import logging
 from pathlib import Path
 from huggingface_hub import snapshot_download
 import time
-import os
 from faster_whisper import WhisperModel
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-class TranscriptionService():
+STR_DEVICE_CPU = "cpu"
+STR_COMPUTE_TYPE_FLOAT32 = "float32"
 
-    # Model repo name
+class Transcriber():
+
     model_repo: str = "guillaumekln/faster-whisper-medium"
-    # Local path to store/load the model
     model_path: Path = Path("models") / model_repo
-    # Model instance (unknown type until loaded)
-    model: Optional[WhisperModel] = None
 
     def __init__(self):
-        logging.info(f"Using model path: {self.model_path}")
-        # Check if model exists locally by checking for a key file (e.g., config.json)
+
+        self.model: Optional[WhisperModel] = None
+
+        start_load = time.time()
+        logger.info(f"Using model path: {self.model_path} on device: {STR_DEVICE_CPU} with compute_type: {STR_COMPUTE_TYPE_FLOAT32}")
+
+        # Check if model exists locally
         if not (self.model_path / "config.json").is_file():
             logging.info("Model not found locally, starting download...")
             logging.warning(
@@ -39,19 +43,11 @@ class TranscriptionService():
         else:
             logging.info("Model found in local cache.")
 
-        start_load = time.time()
         try:
-            cpu_count = os.cpu_count() or 1
-            logging.info(
-                f"Loading faster-whisper model from '{self.model_path}' "
-                f"with cpu_threads '{cpu_count}', and num_workers '{cpu_count}'"
-            )
             model = WhisperModel(
                 str(self.model_path),
-                device="cpu",
-                compute_type="int8",
-                cpu_threads=cpu_count,
-                num_workers=cpu_count,
+                device=STR_DEVICE_CPU,
+                compute_type=STR_COMPUTE_TYPE_FLOAT32
             )
             self.model = model
         except Exception as e:
@@ -70,11 +66,14 @@ class TranscriptionService():
 
         try:
             segments, _ = self.model.transcribe(str(audio_file))
-            lines = [
-                f"{self.format_timestamp(s.start)} --> {self.format_timestamp(s.end)}\n{s.text.strip()}"
-                for s in segments
-            ]
-            full_text = "\n\n".join(lines)
+            lines = []
+            for s in segments:
+                lines.append({
+                    "start": s.start,
+                    "end": s.end,
+                    "text": s.text.strip(),
+                })
+            full_json = {"transcription": lines}
         except Exception as e:
             logging.error(f"Failed to transcribe {audio_file}: {e}")
             return
@@ -84,7 +83,7 @@ class TranscriptionService():
         )
 
         with open(transcript_file, "w", encoding="utf-8") as f:
-            f.write(full_text.strip())
+            f.write(json.dumps(full_json))
             logging.info(f"Transcription saved to: {transcript_file}")
 
 

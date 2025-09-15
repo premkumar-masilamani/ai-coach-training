@@ -2,7 +2,7 @@ import logging
 import argparse
 import sys
 from pathlib import Path
-from services.transcription_service import TranscriptionService
+from src.transcription.transcriber import Transcriber
 
 logger = logging.getLogger()
 
@@ -48,7 +48,7 @@ def main():
     pending_files = []
     for file in input_dir.rglob("*"):
         if file.suffix.lower() in audio_extensions and file.is_file():
-            transcript_file = file.with_suffix(".txt")
+            transcript_file = file.with_suffix(".json")
             if transcript_file.exists():
                 logging.info(f"Skipping. Transcript already exists: {transcript_file}")
             else:
@@ -59,7 +59,7 @@ def main():
         sys.exit(0)
 
     # --- Load and Run Transcriber ---
-    model = TranscriptionService()
+    model = Transcriber()
     for audio_file, transcript_file in pending_files:
         model.transcribe(audio_file, transcript_file)
 
