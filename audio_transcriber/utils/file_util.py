@@ -2,6 +2,7 @@ import os
 import logging
 import json
 from pathlib import Path
+from time_util import format_timestamp
 
 logger = logging.getLogger()
 
@@ -39,10 +40,7 @@ def save_transcript_as_text(folder_path: Path, filename: str, file_content: str)
 
     lines = []
     for s in segments:
-        start = f"{s['start']:.2f}"
-        end = f"{s['end']:.2f}"
-        text = s["text"].strip()
-        lines.append(f"{start} - {end} | {text}")
+        lines.append(f"{format_timestamp(s['start'])} - {format_timestamp(s['end'])} | {s["text"].strip()}")
 
     output_path = os.path.join(folder_path, f"{filename}_transcript.txt")
     with open(output_path, "w", encoding="utf-8") as f:
