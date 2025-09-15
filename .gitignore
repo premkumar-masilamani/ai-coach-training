@@ -81,7 +81,7 @@ ipython_config.py
 .python-version
 
 # ML/AI specific
-models/
+ai_models/
 *.model
 *.pkl
 *.joblib

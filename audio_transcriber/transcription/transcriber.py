@@ -8,13 +8,14 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+AI_MODEL_PATH = Path("ai_models")
 STR_DEVICE_CPU = "cpu"
 STR_COMPUTE_TYPE_FLOAT32 = "float32"
 
 class Transcriber():
 
     model_repo: str = "guillaumekln/faster-whisper-medium"
-    model_path: Path = Path("models") / model_repo
+    model_path: Path = AI_MODEL_PATH / model_repo
 
     def __init__(self):
 
@@ -56,10 +57,10 @@ class Transcriber():
         logging.info(f"Model from '{self.model_path}' loaded in {time.time() - start_load:.2f} seconds.")
 
 
-    def transcribe(self, audio_file: Path, transcript_file: Path):
+    def transcribe(self, audio_file: Path) -> Optional[str]:
         if self.model is None:
             logging.error("Model is not loaded")
-            return
+            return None
 
         logging.info(f"Transcribing: {audio_file}")
         start_transcribe = time.time()
@@ -73,27 +74,13 @@ class Transcriber():
                     "end": s.end,
                     "text": s.text.strip(),
                 })
-            full_json = {"transcription": lines}
+            transcribed_json = {"transcription": lines}
         except Exception as e:
             logging.error(f"Failed to transcribe {audio_file}: {e}")
-            return
+            return None
 
         logging.info(
             f"Transcription completed in {time.time() - start_transcribe:.2f} seconds."
         )
 
-        with open(transcript_file, "w", encoding="utf-8") as f:
-            f.write(json.dumps(full_json))
-            logging.info(f"Transcription saved to: {transcript_file}")
-
-
-    def format_timestamp(self, seconds: float) -> str:
-        """Convert seconds to HH:MM:SS,mmm format."""
-        milliseconds = round(seconds * 1000)
-        hours = milliseconds // 3600000
-        milliseconds %= 3600000
-        minutes = milliseconds // 60000
-        milliseconds %= 60000
-        seconds = milliseconds // 1000
-        milliseconds %= 1000
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
+        return json.dumps(transcribed_json)

@@ -8,6 +8,7 @@ import torch
 from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
 from huggingface_hub import snapshot_download
+from audio_transcriber.utils.time_util import format_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ class Diarizer:
     # Model repo name
     model_repo: str = "pyannote/speaker-diarization-3.1"
     # Local path to store/load the model
-    model_path: Path = Path("models") / model_repo
+    model_path: Path = Path("ai_models") / model_repo
     # Model instance
     pipeline: Optional[Pipeline] = None
 
@@ -449,8 +450,8 @@ class Diarizer:
             output_lines = [f"Speaker Diarization Results for: {os.path.basename(audio_path)}", "=" * 50]
 
             for turn, _, speaker in diarization.itertracks(yield_label=True):
-                start_time = self._format_timestamp(turn.start)
-                end_time = self._format_timestamp(turn.end)
+                start_time = format_timestamp(turn.start)
+                end_time = format_timestamp(turn.end)
                 output_lines.append(f"{start_time} --> {end_time} | {speaker}")
 
             return "\n".join(output_lines)
@@ -459,16 +460,6 @@ class Diarizer:
             logger.error(f"Error formatting diarization output: {e}")
             return "Error formatting diarization results."
 
-    def _format_timestamp(self, seconds: float) -> str:
-        """Convert seconds to HH:MM:SS.mmm format."""
-        milliseconds = round(seconds * 1000)
-        hours = milliseconds // 3600000
-        milliseconds %= 3600000
-        minutes = milliseconds // 60000
-        milliseconds %= 60000
-        seconds_part = milliseconds // 1000
-        milliseconds %= 1000
-        return f"{hours:02d}:{minutes:02d}:{seconds_part:02d}.{milliseconds:03d}"
 
     def get_speaker_count(self, diarization) -> int:
         """Get the number of unique speakers detected.

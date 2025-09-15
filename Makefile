@@ -13,4 +13,4 @@ show:
 
 .PHONY: run
 run:
-	python3 main.py -v -i $(INPUT_DIR)
+	pipenv run python -m audio_transcriber.main -v -i $(INPUT_DIR)

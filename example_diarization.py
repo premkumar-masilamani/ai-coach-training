@@ -11,7 +11,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from src.diarization.diarizer import Diarizer
+from audio_transcriber.diarization.diarizer import Diarizer
 
 # Configure logging
 logging.basicConfig(

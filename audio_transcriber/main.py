@@ -2,11 +2,15 @@ import logging
 import argparse
 import sys
 from pathlib import Path
-from src.transcription.transcriber import Transcriber
+from audio_transcriber.pipeline.pipeline import TranscriptionPipeline
 
 logger = logging.getLogger()
 
-def main():
+def main(input_dir: Path):
+    pipeline = TranscriptionPipeline(input_dir)
+    pipeline.run()
+
+if __name__ == "__main__":
     # --- Parse Arguments ---
     parser = argparse.ArgumentParser(
         description="Batch transcribe audio files using faster-whisper."
@@ -41,28 +45,4 @@ def main():
         logging.error(f"Invalid directory: {input_dir}")
         sys.exit(1)
 
-    # --- Supported audio extensions ---
-    audio_extensions = {'.mp3', '.wav', '.m4a', '.flac', '.aac', '.ogg'}
-
-    # --- Find audio files to transcribe (recursively) ---
-    pending_files = []
-    for file in input_dir.rglob("*"):
-        if file.suffix.lower() in audio_extensions and file.is_file():
-            transcript_file = file.with_suffix(".json")
-            if transcript_file.exists():
-                logging.info(f"Skipping. Transcript already exists: {transcript_file}")
-            else:
-                pending_files.append((file, transcript_file))
-
-    if not pending_files:
-        logging.info(f"No audio files to transcribe in {input_dir}")
-        sys.exit(0)
-
-    # --- Load and Run Transcriber ---
-    model = Transcriber()
-    for audio_file, transcript_file in pending_files:
-        model.transcribe(audio_file, transcript_file)
-
-
-if __name__ == "__main__":
-    main()
+    main(input_dir)
