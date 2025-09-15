@@ -9,19 +9,17 @@ from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
 from huggingface_hub import snapshot_download
 from audio_transcriber.utils.time_util import format_timestamp
+from audio_transcriber.utils.constants import AI_MODEL_PATH
 
 logger = logging.getLogger(__name__)
 
 class Diarizer:
-    # Model repo name
+
     model_repo: str = "pyannote/speaker-diarization-3.1"
-    # Local path to store/load the model
-    model_path: Path = Path("ai_models") / model_repo
-    # Model instance
+    model_path: Path = AI_MODEL_PATH / model_repo
     pipeline: Optional[Pipeline] = None
 
-    # Dependency models required for diarization
-    dependency_models = [
+    dependency_model_repos = [
         "pyannote/segmentation-3.0",
         "pyannote/wespeaker-voxceleb-resnet34-LM"
     ]
@@ -93,8 +91,8 @@ class Diarizer:
 
     def _ensure_dependencies(self, auth_token: Optional[str]) -> None:
         """Ensure all dependency models are downloaded."""
-        for dep_model in self.dependency_models:
-            dep_path = Path("models") / dep_model
+        for dep_model in self.dependency_model_repos:
+            dep_path = AI_MODEL_PATH / dep_model
             config_file = dep_path / "config.yaml"
 
             if not config_file.is_file():
@@ -167,8 +165,8 @@ class Diarizer:
                     self._setup_model_cache(hub_cache_dir, self.model_repo, self.model_path)
 
                     # Setup cache for dependency models
-                    for dep_model in self.dependency_models:
-                        dep_path = Path("models") / dep_model
+                    for dep_model in self.dependency_model_repos:
+                        dep_path = AI_MODEL_PATH / dep_model
                         if dep_path.exists():
                             self._setup_model_cache(hub_cache_dir, dep_model, dep_path)
 
@@ -459,7 +457,6 @@ class Diarizer:
         except Exception as e:
             logger.error(f"Error formatting diarization output: {e}")
             return "Error formatting diarization results."
-
 
     def get_speaker_count(self, diarization) -> int:
         """Get the number of unique speakers detected.

@@ -1,6 +1,7 @@
 import json
 import logging
 from pathlib import Path
+from audio_transcriber.utils.constants import AI_MODEL_PATH,STR_DEVICE_CPU, STR_COMPUTE_TYPE_FLOAT32
 from huggingface_hub import snapshot_download
 import time
 from faster_whisper import WhisperModel
@@ -8,9 +9,6 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-AI_MODEL_PATH = Path("ai_models")
-STR_DEVICE_CPU = "cpu"
-STR_COMPUTE_TYPE_FLOAT32 = "float32"
 
 class Transcriber():
 

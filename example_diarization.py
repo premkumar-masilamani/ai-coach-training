@@ -23,7 +23,7 @@ def main():
     """Main function to demonstrate diarization usage."""
 
     # Example audio file path - update this to your audio file
-    audio_file = "/path/to/your/audio/file.wav"
+    audio_file = "/Users/premkumar/Downloads/AudioFiles/2025-09-15-Swati-Prem.m4a"
 
     # Check if audio file exists
     if not os.path.exists(audio_file):
@@ -54,7 +54,7 @@ def main():
         diarization_result = diarizer.diarize(
             audio_file,
             min_speakers=2,  # Optional: minimum number of speakers
-            max_speakers=4   # Optional: maximum number of speakers
+            max_speakers=2   # Optional: maximum number of speakers
         )
 
         if diarization_result is None:
