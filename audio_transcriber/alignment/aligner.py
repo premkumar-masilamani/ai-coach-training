@@ -2,6 +2,7 @@ import logging
 
 logger = logging.getLogger()
 
+
 class Aligner:
     def __init__(self):
         pass
