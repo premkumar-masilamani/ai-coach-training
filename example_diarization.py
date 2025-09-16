@@ -70,7 +70,7 @@ def main():
         print(f"\nTotal speakers detected: {speaker_count}")
 
         # Save results to file
-        output_file = Path(audio_file).with_suffix('.diarization.txt')
+        output_file = Path(audio_file).with_suffix('_diarization.txt')
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(formatted_output)
 
@@ -107,7 +107,7 @@ def batch_diarize_directory(input_dir: str, audio_extensions: set = None):
     for file in input_path.rglob("*"):
         if file.suffix.lower() in audio_extensions and file.is_file():
             # Check if diarization file already exists
-            diarization_file = file.with_suffix('.diarization.txt')
+            diarization_file = file.with_suffix('_diarization.txt')
             if not diarization_file.exists():
                 audio_files.append(file)
             else:
@@ -135,7 +135,7 @@ def batch_diarize_directory(input_dir: str, audio_extensions: set = None):
 
             if diarization_result is not None:
                 # Save diarization results
-                output_file = audio_file.with_suffix('.diarization.txt')
+                output_file = audio_file.with_suffix('_diarization.txt')
                 formatted_output = diarizer.format_diarization_output(
                     diarization_result, str(audio_file)
                 )

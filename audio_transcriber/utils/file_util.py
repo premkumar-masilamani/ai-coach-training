@@ -2,7 +2,7 @@ import os
 import logging
 import json
 from pathlib import Path
-from time_util import format_timestamp
+from audio_transcriber.utils.time_util import format_timestamp
 
 logger = logging.getLogger()
 
@@ -14,7 +14,7 @@ def load_audio_files(folder_path: Path):
     pending_files = []
     for file in folder_path.rglob("*"):
         if file.suffix.lower() in audio_extensions and file.is_file():
-            transcript_file = file.with_suffix(".txt")
+            transcript_file = file.with_suffix(".json")
             if transcript_file.exists():
                 logging.info(f"Skipping. Transcript already exists: {transcript_file}")
             else:
