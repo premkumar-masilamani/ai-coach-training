@@ -1,11 +1,13 @@
 import json
 import logging
-from pathlib import Path
-from audio_transcriber.utils.constants import AI_MODEL_PATH,STR_DEVICE_CPU, STR_COMPUTE_TYPE_FLOAT32
-from huggingface_hub import snapshot_download
 import time
-from faster_whisper import WhisperModel
+from pathlib import Path
 from typing import Optional
+
+from faster_whisper import WhisperModel
+from huggingface_hub import snapshot_download
+
+from audio_transcriber.utils.constants import AI_MODEL_PATH, STR_DEVICE_CPU, STR_COMPUTE_TYPE_FLOAT32
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +39,8 @@ class Transcriber():
         self.model: Optional[WhisperModel] = None
 
         start_load = time.time()
-        logger.info(f"Using model path: {self.model_path} on device: {STR_DEVICE_CPU} with compute_type: {STR_COMPUTE_TYPE_FLOAT32}")
+        logger.info(
+            f"Using model path: {self.model_path} on device: {STR_DEVICE_CPU} with compute_type: {STR_COMPUTE_TYPE_FLOAT32}")
 
         # Check if model exists locally
         if not (self.model_path / "config.json").is_file():
@@ -73,7 +76,6 @@ class Transcriber():
 
         logging.info(f"Model initialization finished in {time.time() - start_load:.2f} seconds.")
 
-
     def transcribe(self, audio_file: Path) -> Optional[str]:
         """
         Transcribes an audio file into a JSON string with transcription segments.
@@ -97,7 +99,7 @@ class Transcriber():
             logger.debug(f"Calling model.transcribe for {audio_file}")
             segments, info = self.model.transcribe(str(audio_file))
             logger.info(f"Detected language '{info.language}' with {info.language_probability:.2f} probability.")
-            
+
             lines = []
             for s in segments:
                 line = {

@@ -1,21 +1,23 @@
-import logging
 import json
+import logging
 import os
-import time
 import tempfile
+import time
 from pathlib import Path
 from typing import Optional, Tuple
+
 import torch
+from huggingface_hub import snapshot_download
 from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
-from huggingface_hub import snapshot_download
-from audio_transcriber.utils.time_util import format_timestamp
+
 from audio_transcriber.utils.constants import AI_MODEL_PATH
+from audio_transcriber.utils.time_util import format_timestamp
 
 logger = logging.getLogger(__name__)
 
-class Diarizer:
 
+class Diarizer:
     model_repo: str = "pyannote/speaker-diarization-3.1"
     model_path: Path = AI_MODEL_PATH / model_repo
     pipeline: Optional[Pipeline] = None
@@ -294,9 +296,9 @@ class Diarizer:
             cmd = [
                 'ffmpeg', '-i', audio_path,
                 '-acodec', 'pcm_s16le',  # 16-bit PCM
-                '-ar', '16000',          # 16kHz sample rate
-                '-ac', '1',              # Mono
-                '-y',                    # Overwrite output file
+                '-ar', '16000',  # 16kHz sample rate
+                '-ac', '1',  # Mono
+                '-y',  # Overwrite output file
                 temp_wav_path
             ]
 
@@ -399,7 +401,6 @@ class Diarizer:
             logger.error(f"Error formatting diarization output: {e}")
             return "Error formatting diarization results."
 
-
     def diarize(self, audio_path: Path):
         """Perform speaker diarization on the given audio file.
 
@@ -434,8 +435,6 @@ class Diarizer:
         except Exception as e:
             logger.error(f"Error during diarization of {audio_path}: {e}")
             return None
-
-
 
     def get_speaker_count(self, diarization) -> int:
         """Get the number of unique speakers detected.

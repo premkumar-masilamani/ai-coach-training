@@ -3,6 +3,7 @@ from pathlib import Path
 
 logger = logging.getLogger()
 
+
 class AudioConverter:
     def __init__(self):
         pass

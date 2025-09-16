@@ -1,10 +1,11 @@
-from audio_transcriber.utils.file_util import load_audio_files, save_file, save_transcript_as_text
-from audio_transcriber.transcription.transcriber import Transcriber
-from audio_transcriber.diarization.diarizer import Diarizer
-from audio_transcriber.conversion.audio_converter import AudioConverter
 import logging
 from pathlib import Path
+
 from audio_transcriber.alignment.aligner import Aligner
+from audio_transcriber.conversion.audio_converter import AudioConverter
+from audio_transcriber.diarization.diarizer import Diarizer
+from audio_transcriber.transcription.transcriber import Transcriber
+from audio_transcriber.utils.file_util import load_audio_files, save_file, save_transcript_as_text
 
 logger = logging.getLogger()
 
@@ -13,7 +14,7 @@ class TranscriptionPipeline:
 
     def __init__(self, input_dir: Path):
         self.input_dir = input_dir
-        self.transcriber  = Transcriber();
+        self.transcriber = Transcriber();
         self.diarizer = Diarizer();
         self.aligner = Aligner();
         self.converter = AudioConverter();

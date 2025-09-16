@@ -1,13 +1,15 @@
-import os
-import logging
 import json
+import logging
+import os
 from pathlib import Path
+
 from audio_transcriber.utils.time_util import format_timestamp
 
 logger = logging.getLogger()
 
 # --- Supported audio extensions ---
 audio_extensions = {'.mp3', '.wav', '.m4a', '.flac', '.aac', '.ogg'}
+
 
 def load_audio_files(folder_path: Path) -> list[Path]:
     # --- Find audio files to transcribe (recursively) ---
