@@ -1,4 +1,5 @@
 import logging
+import json
 import os
 import time
 import tempfile
@@ -259,7 +260,7 @@ class Diarizer:
                 with open(refs_dir / "main", "w") as f:
                     f.write(fake_revision)
 
-    def _convert_audio_format(self, audio_path: str) -> Tuple[str, bool]:
+    def _convert_audio_format(self, audio_path: Path) -> Tuple[Path, bool]:
         """Convert audio file to WAV format if needed.
 
         Args:
@@ -270,8 +271,7 @@ class Diarizer:
                 - converted_file_path: Path to the converted file (or original if no conversion needed)
                 - is_temporary: True if the converted file is temporary and should be cleaned up
         """
-        audio_path_obj = Path(audio_path)
-        file_extension = audio_path_obj.suffix.lower()
+        file_extension = audio_path.suffix.lower()
 
         # If already a supported format, return as-is
         if file_extension in ['.wav', '.flac', '.mp3']:
@@ -372,72 +372,11 @@ class Diarizer:
             )
             return audio_path, False
 
-    def diarize(self, audio_path: str, min_speakers: Optional[int] = None, max_speakers: Optional[int] = None):
-        """Perform speaker diarization on the given audio file.
-
-        Args:
-            audio_path (str): Path to the audio file to diarize.
-            min_speakers (int, optional): Minimum number of speakers.
-            max_speakers (int, optional): Maximum number of speakers.
-
-        Returns:
-            Diarization result with speaker segments or None if diarization fails.
-        """
-        if self.pipeline is None:
-            logger.error("Diarization pipeline is not available. Model may not be loaded correctly.")
-            return None
-
-        if not os.path.exists(audio_path):
-            logger.error(f"Audio file not found: {audio_path}")
-            return None
-
-        # Convert audio format if needed
-        converted_audio_path, is_temporary = self._convert_audio_format(audio_path)
-
-        try:
-            logger.info(f"Starting diarization for: {audio_path}")
-            if converted_audio_path != audio_path:
-                logger.info(f"Using converted audio file: {converted_audio_path}")
-
-            start_time = time.time()
-
-            # Prepare diarization parameters
-            params = {}
-            if min_speakers is not None:
-                params['min_speakers'] = min_speakers
-            if max_speakers is not None:
-                params['max_speakers'] = max_speakers
-
-            # Perform diarization with progress tracking
-            with ProgressHook() as hook:
-                if params:
-                    diarization = self.pipeline(converted_audio_path, hook=hook, **params)
-                else:
-                    diarization = self.pipeline(converted_audio_path, hook=hook)
-
-            diarization_time = time.time() - start_time
-            logger.info(f"Diarization completed in {diarization_time:.2f} seconds for: {audio_path}")
-
-            return diarization
-
-        except Exception as e:
-            logger.error(f"Error during diarization of {audio_path}: {e}")
-            return None
-        finally:
-            # Clean up temporary converted file if created
-            if is_temporary and converted_audio_path != audio_path:
-                try:
-                    os.unlink(converted_audio_path)
-                    logger.info(f"Cleaned up temporary converted file: {converted_audio_path}")
-                except Exception as e:
-                    logger.warning(f"Failed to clean up temporary file {converted_audio_path}: {e}")
-
-    def format_diarization_output(self, diarization, audio_path: str) -> str:
+    def _format_diarization_output(self, diarization) -> str:
         """Format diarization results into a readable string.
 
         Args:
             diarization: The diarization result from the pipeline.
-            audio_path (str): Path to the audio file (for reference).
 
         Returns:
             str: Formatted diarization output with timestamps and speaker labels.
@@ -446,18 +385,58 @@ class Diarizer:
             return "No diarization results available."
 
         try:
-            output_lines = [f"Speaker Diarization Results for: {os.path.basename(audio_path)}", "=" * 50]
-
+            lines = []
             for turn, _, speaker in diarization.itertracks(yield_label=True):
-                start_time = format_timestamp(turn.start)
-                end_time = format_timestamp(turn.end)
-                output_lines.append(f"{start_time} --> {end_time} | {speaker}")
+                lines.append({
+                    "start": format_timestamp(turn.start),
+                    "end": format_timestamp(turn.end),
+                    "speaker": speaker
+                })
+            diarized_json = {"diarization": lines}
 
-            return "\n".join(output_lines)
+            return json.dumps(diarized_json)
 
         except Exception as e:
             logger.error(f"Error formatting diarization output: {e}")
             return "Error formatting diarization results."
+
+
+    def diarize(self, audio_path: Path):
+        """Perform speaker diarization on the given audio file.
+
+        Args:
+            audio_path (str): Path to the audio file to diarize.
+
+        Returns:
+            Diarization result with speaker segments or None if diarization fails.
+        """
+
+        start_time = time.time()
+
+        if self.pipeline is None:
+            logger.error("Diarization pipeline is not available. Model may not be loaded correctly.")
+            return None
+
+        # Convert audio format if needed
+        # TODO: Move this to pre-processing
+        converted_audio_path, is_temporary = self._convert_audio_format(audio_path)
+        logger.info(f"Starting diarization for: {audio_path}")
+        if converted_audio_path != audio_path:
+            logger.info(f"Using converted audio file: {converted_audio_path}")
+
+        try:
+            # Perform diarization with progress tracking
+            with ProgressHook() as hook:
+                diarization = self.pipeline(converted_audio_path, hook=hook)
+                logger.debug(f"Diarization result: {diarization}")
+
+            logger.info(f"Diarization completed in {time.time() - start_time:.2f} seconds for: {audio_path}")
+            return self._format_diarization_output(diarization)
+        except Exception as e:
+            logger.error(f"Error during diarization of {audio_path}: {e}")
+            return None
+
+
 
     def get_speaker_count(self, diarization) -> int:
         """Get the number of unique speakers detected.
