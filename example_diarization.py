@@ -50,12 +50,7 @@ def main():
         print(f"Processing audio file: {audio_file}")
 
         # Perform diarization
-        # Optional: specify min/max speakers if known
-        diarization_result = diarizer.diarize(
-            audio_file,
-            min_speakers=2,  # Optional: minimum number of speakers
-            max_speakers=2   # Optional: maximum number of speakers
-        )
+        diarization_result = diarizer.diarize(audio_file)
 
         if diarization_result is None:
             print("Diarization failed. Check the logs for more details.")
