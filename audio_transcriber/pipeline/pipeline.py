@@ -2,10 +2,10 @@ import logging
 from pathlib import Path
 
 from audio_transcriber.alignment.aligner import Aligner
-from audio_transcriber.conversion.audio_converter import AudioConverter
+from audio_transcriber.conversion.audio_converter import convert_audio
 from audio_transcriber.diarization.diarizer import Diarizer
 from audio_transcriber.transcription.transcriber import Transcriber
-from audio_transcriber.utils.file_util import load_audio_files, save_file, save_transcript_as_text
+from audio_transcriber.utils.file_util import get_audio_files_list, save_file, save_transcript_as_text
 
 logger = logging.getLogger()
 
@@ -14,21 +14,20 @@ class TranscriptionPipeline:
 
     def __init__(self, input_dir: Path):
         self.input_dir = input_dir
-        self.transcriber = Transcriber();
-        self.diarizer = Diarizer();
-        self.aligner = Aligner();
-        self.converter = AudioConverter();
+        self.transcriber = Transcriber()
+        self.diarizer = Diarizer()
+        self.aligner = Aligner()
 
     def run(self):
-        pending_files = load_audio_files(self.input_dir)
-        if not pending_files:
+        audio_files_list = get_audio_files_list(self.input_dir)
+        if not audio_files_list:
             logging.info(f"No audio files to transcribe in {self.input_dir}")
             return
 
-        for audio_file in pending_files:
+        for audio_file in audio_files_list:
 
-            # Audio Conversion
-            converted_audio_file = self.converter.convert(audio_file)
+            # TODO: Audio Conversion
+            converted_audio_file = convert_audio(audio_file)
 
             # Transcribe
             transcribed_json = self.transcriber.transcribe(converted_audio_file)
@@ -49,8 +48,10 @@ class TranscriptionPipeline:
                 save_file(self.input_dir, diarized_json_filename, diarized_json)
                 logging.info(f"Diarization {diarized_json_filename} saved for {audio_file}")
 
-            # Align
+            # TODO: Align
             # final_transcript = self.aligner.align(transcribed_json, diarized_json)
 
             # Save
             # TODO: Move all the file saving logics in this step.
+
+            # TODO: Clean up the temporary files
