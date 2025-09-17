@@ -11,7 +11,7 @@ logger = logging.getLogger()
 audio_extensions = {'.mp3', '.wav', '.m4a', '.flac', '.aac', '.ogg'}
 
 
-def load_audio_files(folder_path: Path) -> list[Path]:
+def get_audio_files_list(folder_path: Path) -> list[Path]:
     # --- Find audio files to transcribe (recursively) ---
     pending_files = []
     for audio_file in folder_path.rglob("*"):
