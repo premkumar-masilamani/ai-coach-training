@@ -39,6 +39,7 @@ class Transcriber():
         self.model: Optional[WhisperModel] = None
 
         start_load = time.time()
+        logger.info(f"Transcriber initialization started at {time.strftime('%Y-%m-%d %H:%M:%S')}")
         logger.info(
             f"Using model path: {self.model_path} on device: {STR_DEVICE_CPU} with compute_type: {STR_COMPUTE_TYPE_FLOAT32}")
 
@@ -59,20 +60,21 @@ class Transcriber():
                 logger.info("Model download complete.")
             except Exception as e:
                 logger.error(f"Failed to download model: {e}", exc_info=True)
+                raise
         else:
             logger.info("Model found in local cache.")
 
         try:
             logger.info(f"Loading model from {self.model_path}...")
-            model = WhisperModel(
+            self.model = WhisperModel(
                 str(self.model_path),
                 device=STR_DEVICE_CPU,
                 compute_type=STR_COMPUTE_TYPE_FLOAT32
             )
-            self.model = model
             logger.info("Model loaded successfully.")
         except Exception as e:
             logger.error(f"Failed to load model from {self.model_path}: {e}", exc_info=True)
+            raise
 
         logging.info(f"Model initialization finished in {time.time() - start_load:.2f} seconds.")
 
@@ -96,11 +98,17 @@ class Transcriber():
         start_transcribe = time.time()
 
         try:
+            logger.info(f"Beginning transcription process for {audio_file} at {time.strftime('%Y-%m-%d %H:%M:%S')}")
             logger.debug(f"Calling model.transcribe for {audio_file}")
-            segments, info = self.model.transcribe(str(audio_file))
+            segments, info = self.model.transcribe(str(audio_file), word_timestamps=True)
             logger.info(f"Detected language '{info.language}' with {info.language_probability:.2f} probability.")
 
+            logger.info("This may take a while, transcribing audio...")
+            segments = list(segments)
+            logger.info(f"Transcription complete. Got {len(segments)} segments.")
+
             lines = []
+            logger.info("Processing transcribed segments...")
             for s in segments:
                 line = {
                     "start": s.start,
@@ -108,10 +116,10 @@ class Transcriber():
                     "text": s.text.strip(),
                 }
                 lines.append(line)
-                logger.debug(f"Transcribed segment: {line}")
+                logger.debug(f"Processed segment from {s.start:.2f}s to {s.end:.2f}s: {s.text.strip()}")
 
             transcribed_json = {"transcription": lines}
-            logger.info(f"Successfully transcribed {len(lines)} segments.")
+            logger.info(f"Successfully transcribed and processed {len(lines)} segments.")
         except Exception as e:
             logger.error(f"Failed to transcribe {audio_file}: {e}", exc_info=True)
             return None

@@ -382,23 +382,29 @@ class Diarizer:
         Returns:
             str: Formatted diarization output with timestamps and speaker labels.
         """
+        logger.info("Formatting diarization output.")
         if diarization is None:
+            logger.warning("Cannot format output: diarization result is None.")
             return "No diarization results available."
 
         try:
             lines = []
+            logger.info("Iterating through diarization tracks...")
             for turn, _, speaker in diarization.itertracks(yield_label=True):
-                lines.append({
-                    "start": format_timestamp(turn.start),
-                    "end": format_timestamp(turn.end),
+                line = {
+                    "start": turn.start,
+                    "end": turn.end,
                     "speaker": speaker
-                })
+                }
+                lines.append(line)
+                logger.debug(f"Formatted segment: {line}")
             diarized_json = {"diarization": lines}
 
+            logger.info(f"Diarization output formatted with {len(lines)} segments.")
             return json.dumps(diarized_json)
 
         except Exception as e:
-            logger.error(f"Error formatting diarization output: {e}")
+            logger.error(f"Error formatting diarization output: {e}", exc_info=True)
             return "Error formatting diarization results."
 
     def diarize(self, audio_path: Path):
@@ -410,12 +416,14 @@ class Diarizer:
         Returns:
             Diarization result with speaker segments or None if diarization fails.
         """
-
+        logger.info(f"Diarization process started for: {audio_path}")
         start_time = time.time()
 
         if self.pipeline is None:
             logger.error("Diarization pipeline is not available. Model may not be loaded correctly.")
             return None
+
+        logger.info("Diarization pipeline is available.")
 
         # Convert audio format if needed
         # TODO: Move this to pre-processing
@@ -425,16 +433,26 @@ class Diarizer:
             logger.info(f"Using converted audio file: {converted_audio_path}")
 
         try:
+            logger.info("Applying diarization pipeline...")
             # Perform diarization with progress tracking
             with ProgressHook() as hook:
                 diarization = self.pipeline(converted_audio_path, hook=hook)
                 logger.debug(f"Diarization result: {diarization}")
 
+            logger.info("Diarization pipeline applied successfully.")
+            formatted_output = self._format_diarization_output(diarization)
             logger.info(f"Diarization completed in {time.time() - start_time:.2f} seconds for: {audio_path}")
-            return self._format_diarization_output(diarization)
+            return formatted_output
         except Exception as e:
-            logger.error(f"Error during diarization of {audio_path}: {e}")
+            logger.error(f"Error during diarization of {audio_path}: {e}", exc_info=True)
             return None
+        finally:
+            if is_temporary and converted_audio_path and os.path.exists(converted_audio_path):
+                try:
+                    os.remove(converted_audio_path)
+                    logger.info(f"Removed temporary audio file: {converted_audio_path}")
+                except OSError as e:
+                    logger.error(f"Error removing temporary file {converted_audio_path}: {e}")
 
     def get_speaker_count(self, diarization) -> int:
         """Get the number of unique speakers detected.
