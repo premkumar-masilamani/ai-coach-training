@@ -1,16 +1,18 @@
 import json
 import logging
-from pathlib import Path
-from huggingface_hub import snapshot_download
 import time
-from faster_whisper import WhisperModel
+from pathlib import Path
 from typing import Optional
 
-logger = logging.getLogger(__name__)
+from faster_whisper import WhisperModel
+from huggingface_hub import snapshot_download
 
-AI_MODEL_PATH = Path("ai_models")
-STR_DEVICE_CPU = "cpu"
-STR_COMPUTE_TYPE_FLOAT32 = "float32"
+from audio_transcriber.utils.constants import AI_MODEL_PATH
+from audio_transcriber.utils.constants import DEFAULT_COMPUTE_TYPE
+from audio_transcriber.utils.constants import DEFAULT_DEVICE_CPU
+from audio_transcriber.utils.constants import DEFAULT_LANGUAGE
+
+logger = logging.getLogger(__name__)
 
 class Transcriber():
 
@@ -22,7 +24,7 @@ class Transcriber():
         self.model: Optional[WhisperModel] = None
 
         start_load = time.time()
-        logger.info(f"Using model path: {self.model_path} on device: {STR_DEVICE_CPU} with compute_type: {STR_COMPUTE_TYPE_FLOAT32}")
+        logger.info(f"Using model path: {self.model_path} on device: {DEFAULT_DEVICE_CPU} with compute_type: {DEFAULT_COMPUTE_TYPE}")
 
         # Check if model exists locally
         if not (self.model_path / "config.json").is_file():
@@ -47,8 +49,8 @@ class Transcriber():
         try:
             model = WhisperModel(
                 str(self.model_path),
-                device=STR_DEVICE_CPU,
-                compute_type=STR_COMPUTE_TYPE_FLOAT32
+                device=DEFAULT_DEVICE_CPU,
+                compute_type=DEFAULT_COMPUTE_TYPE
             )
             self.model = model
         except Exception as e:
@@ -66,7 +68,7 @@ class Transcriber():
         start_transcribe = time.time()
 
         try:
-            segments, _ = self.model.transcribe(str(audio_file))
+            segments, _ = self.model.transcribe(str(audio_file), language=DEFAULT_LANGUAGE)
             lines = []
             for s in segments:
                 lines.append({
