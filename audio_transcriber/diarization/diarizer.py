@@ -8,6 +8,8 @@ import torch
 from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
 from huggingface_hub import snapshot_download
+
+from audio_transcriber.utils.constants import DEFAULT_DEVICE_CPU
 from audio_transcriber.utils.time_util import format_timestamp
 
 logger = logging.getLogger(__name__)
@@ -196,7 +198,7 @@ class Diarizer:
                 )
 
             # Set device only if pipeline was loaded successfully
-            device = torch.device("cpu")  # Default device
+            device = torch.device(DEFAULT_DEVICE_CPU)  # Default device
             if self.pipeline is not None:
                 if torch.backends.mps.is_available():
                     device = torch.device("mps")
@@ -205,7 +207,6 @@ class Diarizer:
                     device = torch.device("cuda")
                     logger.info("Using CUDA GPU")
                 else:
-                    device = torch.device("cpu")
                     logger.info("Using CPU")
 
                 self.pipeline.to(device)
