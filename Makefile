@@ -1,4 +1,4 @@
-INPUT_DIR = "/Users/premkumar/Downloads/AudioFiles"
+INPUT_DIR = "./audio_files/"
 
 .PHONY: setup
 setup:
