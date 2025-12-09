@@ -1,0 +1,1 @@
+Read the uploaded coaching transcript and process it based on the uploaded prompt.

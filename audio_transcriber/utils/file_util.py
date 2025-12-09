@@ -24,8 +24,7 @@ def load_audio_files(folder_path: Path):
 
 
 def save_file(folder_path: Path, filename: str, file_content: str):
-    output_path = filename
-    with open(output_path, "w", encoding="utf-8") as f:
+    with open(filename, "w", encoding="utf-8") as f:
         f.write(file_content)
 
 
@@ -45,6 +44,5 @@ def save_transcript_as_text(folder_path: Path, filename: str, file_content: str)
         text = s["text"].strip()
         lines.append(f"{start} - {end} | {text}")
 
-    output_path = f"{filename}_transcript.txt"
-    with open(output_path, "w", encoding="utf-8") as f:
+    with open(filename, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
