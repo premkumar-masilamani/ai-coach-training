@@ -1,10 +1,9 @@
-INPUT_DIR = "./audio_files/"
+INPUT_DIR = ./audio_files/
 
 .PHONY: setup
 setup:
 	@echo "Creating virtual environment..."
 	pipenv install
-	pipenv shell
 
 .PHONY: show
 show:
