@@ -10,6 +10,10 @@ faster-whisper = "*"
 huggingface-hub = "*"
 pydub = "*"
 pipeline = "*"
+langchain = "*"
+langchain-google-genai = "*"
+langchain-core = "*"
+llm = "*"
 
 [dev-packages]
 

@@ -1,0 +1,66 @@
+{
+  "prompt": {
+    "title": "Enhanced Prompt for Client-Centered Coaching Analysis (ICF-Aligned)",
+    "description": "Your task is to analyze the provided coaching conversation transcript and present your findings in distinct, self-contained parts, adhering strictly to the constraints below. The goal is to maximize the client's benefit by fostering self-discovery, mood improvement, problem-solving, and sustainable personal growth, consistent with ICF’s definition of coaching as partnering with clients in a thought-provoking and creative process that inspires them to maximize their personal and professional potential.",
+    "parts": [
+      {
+        "id": "part1",
+        "title": "Client's Internal Landscape (Client's Voice & Perspective)",
+        "instructions": [
+          "Adopt the persona of the client",
+          "Summarize their internal thought process, using only their own metaphors, language style, and logic as explicitly found within the transcript",
+          "The summary should be 5 paragraphs or less.",
+          "Capture how the client perceives their challenges, processes resistance, and articulates their inner dilemmas.",
+          "Do not interpret from an external point of view. Instead, genuinely think and write as if you are the client, attempting to figure things out for yourself.",
+          "Retain the client's original words and metaphors as much as possible to maintain a personal touch."
+        ]
+      },
+      {
+        "id": "part2",
+        "title": "NLP Neurological Levels Mapping (Dilts Model)",
+        "instructions": [
+          "Map client statements from the transcript to the following Neurological Levels. Provide direct quotes for each level identified.",
+          "- **Environment (Where/When)**",
+          "- **Behavior (What)**",
+          "- **Capability (How)**",
+          "- **Belief (Why)**",
+          "- **Identity (Who)**",
+          "- **Purpose (Why else/For what higher purpose)**",
+          "Construct the next section to shift the client upward in levels (e.g., from Capability to Identity or Purpose), facilitating deeper awareness and systemic understanding"
+        ]
+      },
+      {
+        "id": "part3",
+        "title": "Practical Next Steps (Professional Coaching Tone)",
+        "instructions": [
+          "Adopt the persona of a professional coach.",
+          "Based entirely on what the client shared in the transcript, offer clear and practical next steps to enhance mood, solve problems, and promote lasting improvement, aligning with ICF’s emphasis on client-owned outcomes and self-directed growth.",
+          "Maintain a professional coaching tone: warm, appropriately challenging when needed, forward-moving, and personalized.",
+          "Avoid generic advice or directive instructions. Frame all suggestions as options for the client to explore, anchoring them firmly in the client’s language, metaphors, and what they have already discovered or expressed.",
+          "Include relevant insights or perspectives that could help the client deepen their self-awareness and map out actionable items for growth.",
+          "Structure the suggestions as 7 or fewer bullet points, ensuring no redundancy.",
+          "Each bullet point should be concise and easy to consume (e.g., 3-4 sentences max), highly actionable (e.g., tailored to the client’s goals and insights), and personalized.",
+          "Focus on empowering the client to take ownership of their next steps, reflecting ICF’s commitment to unlocking potential through partnership."
+        ]
+      }
+    ],
+    "constraints": {
+      "general": [
+        "Use only information explicitly present in the provided transcript as the foundation, ensuring all suggestions stem from the client’s own words and the coaching dialogue.",
+        "Absolutely avoid introducing assumptions, external frameworks, or any information not explicitly stated by the client or coach in the conversation.",
+        "Ensure all generated content is self-contained within this single response.",
+        "Use the client's name as and when appropriate throughout both parts.",
+        "Remove all references from the output."
+      ],
+      "formatting": [
+        "Remove hyperlinks from the output.",
+        "Remember to use Markdown for headings, bullet points, and to format direct quotes clearly."
+      ]
+    },
+    "metadata": {
+      "created_date": "2025-09-02",
+      "created_time": "06:09 PM IST",
+      "standards": "ICF (International Coach Federation) coaching definition"
+    }
+  }
+}

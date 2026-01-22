@@ -11,7 +11,6 @@ logger = logging.getLogger()
 
 
 class TranscriptionPipeline:
-
     def __init__(self, input_dir: Path):
         self.input_dir = input_dir
         self.transcriber = Transcriber()

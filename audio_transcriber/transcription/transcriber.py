@@ -68,8 +68,8 @@ class Transcriber():
             logger.info(f"Loading model from {self.model_path}...")
             self.model = WhisperModel(
                 str(self.model_path),
-                device=STR_DEVICE_CPU,
-                compute_type=STR_COMPUTE_TYPE_FLOAT32
+                device=DEFAULT_DEVICE_CPU,
+                compute_type=DEFAULT_COMPUTE_TYPE
             )
             logger.info("Model loaded successfully.")
         except Exception as e:
