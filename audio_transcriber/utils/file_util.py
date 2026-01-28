@@ -8,7 +8,7 @@ from audio_transcriber.utils.time_util import format_timestamp
 logger = logging.getLogger()
 
 # --- Supported audio extensions ---
-audio_extensions = {'.mp3', '.wav', '.m4a', '.flac', '.aac', '.ogg'}
+audio_extensions = {".mp3", ".wav", ".m4a", ".flac", ".aac", ".ogg"}
 
 
 def get_audio_files_list(folder_path: Path) -> list[Path]:
@@ -42,8 +42,9 @@ def save_transcript_as_text(folder_path: Path, filename: Path, file_content: str
 
     lines = []
     for s in segments:
-        lines.append(f"{format_timestamp(s['start'])} - {format_timestamp(s['end'])} | {s["text"].strip()}")
+        lines.append(
+            f"{format_timestamp(s['start'])} - {format_timestamp(s['end'])} | {s['text'].strip()}"
+        )
 
-    output_path = os.path.join(folder_path, f"{filename}_transcript.txt")
-    with open(output_path, "w", encoding="utf-8") as f:
+    with open(filename, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
