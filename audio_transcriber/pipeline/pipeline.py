@@ -16,10 +16,10 @@ logger = logging.getLogger()
 
 
 class TranscriptionPipeline:
-    def __init__(self, input_dir: Path):
+    def __init__(self, input_dir: Path, offline: bool = False):
         self.input_dir = input_dir
-        self.transcriber = Transcriber()
-        self.diarizer = Diarizer()
+        self.transcriber = Transcriber(offline=offline)
+        self.diarizer = Diarizer(offline=offline)
 
     def run(self):
         pending_files = load_audio_files(self.input_dir)

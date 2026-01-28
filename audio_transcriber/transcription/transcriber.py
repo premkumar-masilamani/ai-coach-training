@@ -19,15 +19,20 @@ class Transcriber():
     model_repo: str = "guillaumekln/faster-whisper-medium"
     model_path: Path = AI_MODEL_PATH / model_repo
 
-    def __init__(self):
+    def __init__(self, offline: bool = False):
 
         self.model: Optional[WhisperModel] = None
+        self.offline = offline
 
         start_load = time.time()
         logger.info(f"Using model path: {self.model_path} on device: {DEFAULT_DEVICE_CPU} with compute_type: {DEFAULT_COMPUTE_TYPE}")
 
         # Check if model exists locally
         if not (self.model_path / "config.json").is_file():
+            if self.offline:
+                logger.error(f"Model not found at {self.model_path} and offline mode is enabled.")
+                return
+
             logging.info("Model not found locally, starting download...")
             logging.warning(
                 "This is a large model and may take a long time to download."
