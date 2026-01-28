@@ -41,9 +41,16 @@ class TranscriptionPipeline:
 
             # Diarize
             diarization_result = self.diarizer.diarize(processed_audio_file)
+            if diarization_result is None:
+                logging.warning(
+                    f"Diarization failed for {audio_file}. "
+                    "Make sure HF_TOKEN is set and you have access to the model."
+                )
 
             # Align
-            aligned_segments = align_transcript(transcription_segments, diarization_result)
+            aligned_segments = align_transcript(
+                transcription_segments, diarization_result
+            )
 
             # Save
             final_data = {"transcription": aligned_segments}

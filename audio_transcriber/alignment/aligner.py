@@ -16,30 +16,30 @@ def align_transcript(transcription_segments: list, diarization_result) -> list:
         list: List of dicts with 'start', 'end', 'text', and 'speaker'.
     """
     if diarization_result is None:
-        logger.warning("No diarization result provided, returning segments without speakers.")
-        return transcription_segments
+        logger.warning("No diarization result provided.")
 
     aligned_segments = []
     for segment in transcription_segments:
-        start = segment['start']
-        end = segment['end']
-
-        # Find speaker with max overlap
-        query_segment = Segment(start, end)
-        overlap = diarization_result.crop(query_segment)
+        start = segment["start"]
+        end = segment["end"]
 
         speaker = "UNKNOWN"
-        if overlap:
-            speaker_durations = {}
-            for sub_segment, _, spk in overlap.itertracks(yield_label=True):
-                speaker_durations[spk] = speaker_durations.get(spk, 0) + sub_segment.duration
 
-            if speaker_durations:
-                speaker = max(speaker_durations, key=speaker_durations.get)
+        if diarization_result is not None:
+            # Find speaker with max overlap
+            query_segment = Segment(start, end)
+            overlap = diarization_result.crop(query_segment)
 
-        aligned_segments.append({
-            **segment,
-            "speaker": speaker
-        })
+            if overlap:
+                speaker_durations = {}
+                for sub_segment, _, spk in overlap.itertracks(yield_label=True):
+                    speaker_durations[spk] = (
+                        speaker_durations.get(spk, 0) + sub_segment.duration
+                    )
+
+                if speaker_durations:
+                    speaker = max(speaker_durations, key=speaker_durations.get)
+
+        aligned_segments.append({**segment, "speaker": speaker})
 
     return aligned_segments
