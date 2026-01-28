@@ -152,7 +152,7 @@ class Diarizer:
                     # it will load from AI_MODEL_PATH/hub
                     self.pipeline = Pipeline.from_pretrained(
                         self.model_repo,
-                        use_auth_token=None,
+                        token=None,
                         cache_dir=models_parent
                     )
 
@@ -173,7 +173,7 @@ class Diarizer:
                 auth_token = os.getenv('HF_TOKEN')
                 self.pipeline = Pipeline.from_pretrained(
                     self.model_repo,
-                    use_auth_token=auth_token
+                    token=auth_token
                 )
 
             # Set device
