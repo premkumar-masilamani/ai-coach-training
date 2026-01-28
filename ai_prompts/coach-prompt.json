@@ -1,7 +1,7 @@
 {
   "prompt": {
-    "title": "ICF Coaching Evaluation (ACC/PCC/MCC)",
-    "personality": "You are an expert ICF MCC Assessor with extensive experience in evaluating coaching conversations against ACC, PCC, and MCC standards.",
+    "title": "MCC-Level Coaching Evaluation",
+    "personality": "You are an expert ICF MCC Assessor with extensive experience in evaluating MCC-Level coaching conversations",
     "tasks": [
       "Analyze the provided coaching transcript. Base your entire analysis only on the information explicitly present in the transcript",
       "Do not introduce external context, assumptions, or personal interpretations",
@@ -77,282 +77,141 @@
       },
       {
         "id": "section2",
-        "title": "Mastery of ICF Core Competencies (11 Competencies)",
+        "title": "Mastery of ICF Core Competencies (2021)",
         "instructions": [
-          "For each of the 11 ICF Core Competencies listed below, evaluate the coach's demonstration based _solely_ on the transcript and assign an Assessment Level (ACC, PCC, or MCC).",
-          "Use the provided level descriptions and non-passing criteria to inform your assessment.",
-          "The coach must meet the MCC-level descriptions and avoid all MCC non-passing behaviors to be considered at the MCC level."
+          "For each of the ICF Core Competencies listed below, evaluate the coach's demonstration based _solely_ on the transcript. Assign one of the following statuses:",
+          "- **Fully demonstrated:** Clear and consistent evidence of the competency at an MCC level.",
+          "- **Partially demonstrated:** Some evidence, but inconsistent, or opportunities for deeper application at MCC level were missed.",
+          "- **Not demonstrated or missed despite clear opportunity:** No evidence, or a clear chance to demonstrate was overlooked, particularly at the MCC standard.",
+          "The coach must demonstrate MCC-level proficiency across all competencies without falling into non-passing behaviors, as per ICF Core Competencies Rating Levels."
         ],
         "formatting": [
           "For each competency, provide:",
-          "- **Assessment:** [ACC / PCC / MCC]",
+          "- **Status**",
           "- **Evidence:** Direct quotes from the transcript as evidence",
-          "- **Comments:** Concise commentary explaining the assessment level based on the provided criteria.",
-          "- **Non-Passing Criteria Check:** Explicitly state if any PCC or MCC non-passing behaviors were observed.",
-          "- **Suggestions:** List 2-3 gaps or areas for improvement to reach or sustain the next level."
+          "- **Comments:** Concise commentary grounded in the client's language, themes, and emotional patterns, explaining _why_ you assigned that status, with a specific focus on ICF core competencies",
+          "- **Strengths:** List 2-3 examples of MCC-level demonstration (e.g., behaviors that show full partnership, systemic exploration, or client-led insights).",
+          "- **Suggestions:** List 2-3 gaps or non-MCC behaviors, with suggestions to elevate to MCC"
         ],
         "subparts": [
           {
             "id": "competency1",
-            "title": "Ethics and Standards",
-            "definition": "Understands and consistently applies coaching ethics and standards of coaching.",
-            "assessment_levels": {
-              "ACC/PCC/MCC": "Not directly assessed during oral exam, but fundamental clarity in skill use must be present."
-            },
-            "non_passing_criteria": [
-              "Focuses primarily on telling the client what to do or how to do it (consulting mode).",
-              "The conversation is based primarily in the past, particularly the emotional past (therapeutic mode).",
-              "Is not clear on basic foundation exploration and evoking skills.",
-              "Almost exclusively gives advice or indicates that a particular answer chosen by the coach is what the client should do."
+            "title": "Demonstrates Ethical Practice",
+            "definition": "Understands and consistently applies coaching ethics and standards of coaching",
+            "instructions": [
+              "Demonstrates personal integrity and honesty in interactions with clients, sponsors and relevant stakeholders",
+              "Is sensitive to clients’ identity, environment, experiences, values and beliefs",
+              "Uses language appropriate and respectful to clients, sponsors and relevant stakeholders",
+              "Abides by the ICF Code of Ethics and upholds the Core Values",
+              "Maintains confidentiality with client information per stakeholder agreements and pertinent laws",
+              "Maintains the distinctions between coaching, consulting, psychotherapy and other support professions",
+              "Refers clients to other support professionals, as appropriate"
             ]
           },
           {
             "id": "competency2",
-            "title": "Establishing the Coaching Agreement",
-            "definition": "Ability to understand what is required in the specific coaching interaction and to come to agreement with the prospective and new client about the coaching process and relationship.",
-            "assessment_levels": {
-              "ACC": "Initially establishing the 'rules of engagement'. Establishing the agreement for the current session. Coach takes what client says at surface level with little further exploration.",
-              "PCC": "Coach takes what client says they want to work on and attends to that agenda with some exploration as to measures of success for each topic.",
-              "MCC": "Coach explores fully what client wants from session, establishes measures of success, and ensures clarity about coaching purpose. Returns to check regularly if the direction continues to serve the client's purpose."
-            },
-            "non_passing_criteria": {
-              "PCC": [
-                "Coach chooses the topic for the client.",
-                "Coach does not coach around the topic the client has chosen.",
-                "Coach does not engage in some exploration of the measures of success or defines those measures for the client.",
-                "Coach does not engage in some exploration of underlying issues or does not check with client about progress."
-              ],
-              "MCC": [
-                "Full partnership with the client is not demonstrated.",
-                "Coach chooses the topic(s) for the client.",
-                "Coach does not coach around the topic(s) the client has chosen.",
-                "Coach does not explore the measures of success to a degree that achieves clarity about intent or direction.",
-                "Coach does not allow the client full input into the issues discussed.",
-                "Coach does not check with the client about progress toward the session goal."
-              ]
-            }
+            "title": "Embodies a Coaching Mindset",
+            "definition": "Develops and maintains a mindset that is open, curious, flexible and client-centered",
+            "instructions": [
+              "Acknowledges that clients are responsible for their own choices",
+              "Engages in ongoing learning and development as a coach",
+              "Develops an ongoing reflective practice to enhance one’s coaching",
+              "Remains aware of and open to the influence of context and culture on self and others",
+              "Uses awareness of self and one’s intuition to benefit clients",
+              "Develops and maintains the ability to regulate one’s emotions",
+              "Mentally and emotionally prepares for sessions",
+              "Seeks help from outside sources when necessary"
+            ]
           },
           {
             "id": "competency3",
-            "title": "Establishing Trust and Intimacy with the Client",
-            "definition": "Ability to create a safe, supportive environment that produces ongoing mutual respect and trust.",
-            "assessment_levels": {
-              "ACC": "Setting a strong foundation upfront for partnership. Coach attends to client’s agenda but is attached to his/her own performance.",
-              "PCC": "Coach may have some degree of trust but remains conscious of presenting an image of a 'good coach,' less willing to risk or not know.",
-              "MCC": "Coach is connected to complete trust in the moment. Comfortable not knowing, willing to be vulnerable. Sense of complete ease and naturalness."
-            },
-            "non_passing_criteria": {
-              "PCC": [
-                "Coach demonstrates significant interest in coach’s view rather than client’s view.",
-                "Coach does not seek information from the client about the client’s thinking.",
-                "Coach does not seek information about the client’s goals.",
-                "Attention seems to be on coach’s own performance or demonstration of knowledge.",
-                "Coach does not invite the client to share thinking on an equal level."
-              ],
-              "MCC": [
-                "Does not treat the client as a full partner in creating the coaching process.",
-                "Coach exhibits an interest in coach’s view rather than client’s view.",
-                "Coach does not seek information from the client about the client’s thinking or goals.",
-                "Attention is on coach’s own performance or knowledge.",
-                "Coach chooses direction and tools without significant input from the client.",
-                "Any indication of teaching rather than coaching."
-              ]
-            }
+            "title": "Establishes and Maintains Agreements",
+            "definition": "Partners with the client and relevant stakeholders to create clear agreements about the coaching relationship, process, plans and goals. Establishes agreements for the overall coaching engagement as well as those for each coaching session",
+            "instructions": [
+              "Explains what coaching is and is not and describes the process to the client and relevant stakeholders",
+              "Reaches agreement about what is and is not appropriate in the relationship, what is and is not being offered, and the responsibilities of the client and relevant stakeholders",
+              "Reaches agreement about the guidelines and specific parameters of the coaching relationship such as logistics, fees, scheduling, duration, termination, confidentiality and inclusion of others",
+              "Partners with the client and relevant stakeholders to establish an overall coaching plan and goals",
+              "Partners with the client to determine client-coach compatibility",
+              "Partners with the client to identify or reconfirm what they want to accomplish in the session",
+              "Partners with the client to define what the client believes they need to address or resolve to achieve what they want to accomplish in the session",
+              "Partners with the client to define or reconfirm measures of success for what the client wants to accomplish in the coaching engagement or individual session",
+              "Partners with the client to manage the time and focus of the session",
+              "Continues coaching in the direction of the client’s desired outcome unless the client indicates otherwise",
+              "Partners with the client to end the coaching relationship in a way that honors the experience"
+            ]
           },
           {
             "id": "competency4",
-            "title": "Coaching Presence",
-            "definition": "Ability to be fully conscious and create spontaneous relationship with the client, employing a style that is open, flexible and confident.",
-            "assessment_levels": {
-              "ACC": "Attends to agenda but attached to performance; presence diluted by attention to self. Substitutes thinking and analysis for presence.",
-              "PCC": "Attends to agenda but drives the coaching and choice of tools. Rarely holds both objective and subjective perspectives. Need for direction toward solution.",
-              "MCC": "Completely connected observer. Connection to the whole of who the client is. Ready to be touched by the client. Evidences complete curiosity and full partnership."
-            },
-            "non_passing_criteria": {
-              "PCC": [
-                "Significant interest in coach’s view rather than client’s view.",
-                "Unresponsive to information from the client.",
-                "Attention on coach’s own performance or knowledge.",
-                "Overly reliant on a coaching formula, specific tool, or standard questions.",
-                "Does not allow the client to contribute to creating the method of the session."
-              ],
-              "MCC": [
-                "Does not treat the client as a full partner in creating the coaching process.",
-                "Exhibits interest in coach’s view rather than client’s view.",
-                "Attention on coach’s own performance or knowledge.",
-                "Does not invite client to share thinking on an equal level or chooses direction/tools without client input.",
-                "Any indication of teaching rather than coaching.",
-                "Relies on standard coaching formulas or tools rather than allowing client to help develop them."
-              ]
-            }
+            "title": "Cultivates Trust and Safety",
+            "definition": "Partners with the client to create a safe, supportive environment that allows the client to share freely. Maintains a relationship of mutual respect and trust",
+            "instructions": [
+              "Seeks to understand the client within their context which may include their identity, environment, experiences, values and beliefs",
+              "Demonstrates respect for the client’s identity, perceptions, style and language and adapts one’s coaching to the client",
+              "Acknowledges and respects the client’s unique talents, insights and work in the coaching process",
+              "Shows support, empathy and concern for the client",
+              "Acknowledges and supports the client’s expression of feelings, perceptions, concerns, beliefs and suggestions",
+              "Demonstrates openness and transparency as a way to display vulnerability and build trust with the client"
+            ]
           },
           {
             "id": "competency5",
-            "title": "Active Listening",
-            "definition": "Ability to focus completely on what the client is saying and is not saying, to understand the meaning of what is said in the context of the client’s desires, and to support client self-expression.",
-            "assessment_levels": {
-              "ACC": "Hears and responds at surface level. Evidence of attachment to fixing the problem and giving value through fixing.",
-              "PCC": "Listening on a conscious level, focused on agenda. Gather information that fits into coach's tools. Linear listening; missing key nuances.",
-              "MCC": "Completely attuned as a learner. Listening at logical, emotional, and organic levels. Recognizes intuitive and energetic perception. Cumulative listening."
-            },
-            "non_passing_criteria": {
-              "PCC": [
-                "Listening is not focused on or responding to what the client says.",
-                "Response is not related to what the client is trying to achieve.",
-                "Hearing is limited to listening for problems or weaknesses.",
-                "Appears to be listening for a place to demonstrate knowledge or tell the client what to do.",
-                "Only hears through own perceptions and models of thinking."
-              ],
-              "MCC": [
-                "Listening is not based on the whole client or multiple levels.",
-                "Listening is filtered only through coach’s methods of thinking.",
-                "Does not use the client’s methods of thinking as a significant coaching tool.",
-                "Nuances of client’s language are not reflected in responses.",
-                "Appears to be listening for a place to demonstrate knowledge or tell the client what to do."
-              ]
-            }
+            "title": "Maintains Presence",
+            "definition": "Is fully conscious and present with the client, employing a style that is open, flexible, grounded and confident",
+            "instructions": [
+              "Remains focused, observant, empathetic and responsive to the client",
+              "Demonstrates curiosity during the coaching process",
+              "Manages one’s emotions to stay present with the client",
+              "Demonstrates confidence in working with strong client emotions during the coaching process",
+              "Is comfortable working in a space of not knowing",
+              "Creates or allows space for silence, pause or reflection"
+            ]
           },
           {
             "id": "competency6",
-            "title": "Powerful Questioning",
-            "definition": "Ability to ask questions that reveal the information needed for maximum benefit to the coaching relationship and the client.",
-            "assessment_levels": {
-              "ACC": "Questions are generally seeking information, formulaic, and sometimes leading toward a 'correct answer'. Geared to solving issues quickly.",
-              "PCC": "Mix of informational and powerful questions. Focus toward solution. Uses coaching terminology versus client's language.",
-              "MCC": "Mostly direct, evocative questions that require significant thought. Uses client's language and style. Fully based in curiosity; not afraid of discomfort."
-            },
-            "non_passing_criteria": {
-              "PCC": [
-                "Questions reflect coach’s view or a preconceived answer.",
-                "Questions are leading the client in a direction chosen by the coach without discussion.",
-                "Unable to move beyond standardized coaching questions."
-              ],
-              "MCC": [
-                "Questions are not evocative or do not ask the client to think in a larger space.",
-                "Frequently asks informational questions or questions that keep the client in the past/detail.",
-                "Questions do not make frequent use of client’s language or thinking style.",
-                "Questions reflect coach’s view or a preconceived answer.",
-                "Unable to move beyond standardized questions/models."
-              ]
-            }
+            "title": "Listens Actively",
+            "definition": "Focuses on what the client is and is not saying to fully understand what is being communicated in the context of the client systems and to support client self-expression",
+            "instructions": [
+              "Considers the client’s context, identity, environment, experiences, values and beliefs to enhance understanding of what the client is communicating",
+              "Reflects or summarizes what the client communicated to ensure clarity and understanding",
+              "Recognizes and inquires when there is more to what the client is communicating",
+              "Notices, acknowledges and explores the client’s emotions, energy shifts, non-verbal cues or other behaviors",
+              "Integrates the client’s words, tone of voice and body language to determine the full meaning of what is being communicated",
+              "Notices trends in the client’s behaviors and emotions across sessions to discern themes and patterns"
+            ]
           },
           {
             "id": "competency7",
-            "title": "Direct Communication",
-            "definition": "Ability to communicate effectively during coaching session, and to use language that has the greatest positive impact on the client.",
-            "assessment_levels": {
-              "ACC": "Fairly direct but uses too many words or 'dresses up' questions. Vocabulary from coach's training. Communication on a safe level.",
-              "PCC": "Usually direct but sometimes treats intuition as truth. May soften communication for fear of being wrong. Uses coaching language.",
-              "MCC": "Shares freely without attachment. Direct and simple, incorporating client’s language. Trusts client to choose response. Invites direct communication back."
-            },
-            "non_passing_criteria": {
-              "PCC": [
-                "Does not attend to client's agenda or changes it without input.",
-                "Communication is convoluted, meandering, or circuitous.",
-                "Attached to a particular outcome or solution."
-              ],
-              "MCC": [
-                "Significantly relies on own language and thinking models without use of client's.",
-                "Does not fully invite client participation on an equal level.",
-                "Communication reflects an agenda or directing by the coach.",
-                "Limits thinking/learning direction for the client without specific interaction and assent."
-              ]
-            }
+            "title": "Evokes Awareness",
+            "definition": "Facilitates client insight and learning by using tools and techniques such as powerful questioning, silence, metaphor or analogy",
+            "instructions": [
+              "Considers client experience when deciding what might be most useful",
+              "Challenges the client as a way to evoke awareness or insight",
+              "Asks questions about the client, such as their way of thinking, values, needs, wants and beliefs",
+              "Asks questions that help the client explore beyond current thinking",
+              "Invites the client to share more about their experience in the moment",
+              "Notices what is working to enhance client progress",
+              "Adjusts the coaching approach in response to the client’s needs",
+              "Helps the client identify factors that influence current and future patterns of behavior, thinking or emotion",
+              "Invites the client to generate ideas about how they can move forward and what they are willing or able to do",
+              "Supports the client in reframing perspectives",
+              "Shares observations, insights and feelings, without attachment, that have the potential to create new learning for the client"
+            ]
           },
           {
             "id": "competency8",
-            "title": "Creating Awareness",
-            "definition": "Ability to integrate and accurately evaluate multiple sources of information, and to make interpretations that help the client to gain awareness and thereby achieve agreed-upon results.",
-            "assessment_levels": {
-              "ACC": "Awareness at level of solving problem or achieving goal. Limited to new techniques versus learning about self.",
-              "PCC": "Majority of awareness geared to technique; new awareness about who the client is is limited. Narrower scope.",
-              "MCC": "Invitation to exploration precedes and is greater than invitation to solution. Coach as explorer, willing not to know. No evidence of 'fixing'."
-            },
-            "non_passing_criteria": {
-              "PCC": [
-                "Does not attend to client's agenda or appears attached to an outcome.",
-                "Narrows exploration to a single issue without discussion or consent.",
-                "Substitutes assessments or standard exercises for inquiry.",
-                "States what awareness is without exploring with the client."
-              ],
-              "MCC": [
-                "Drives the client toward solution without fully exploring important issues.",
-                "Does not fully allow client to use their intuition/thinking as tools.",
-                "Dialogue does not provide sufficient space for client's full participation.",
-                "Communication reflects coach's agenda or directing.",
-                "Limits thinking/learning direction without specific interaction and assent."
-              ]
-            }
-          },
-          {
-            "id": "competency9",
-            "title": "Designing Actions",
-            "definition": "Ability to create with the client opportunities for ongoing learning, during coaching and in work/life situations.",
-            "assessment_levels": {
-              "ACC": "Tends to suggest homework the coach thinks best. Partial partnership. Actions tend to be one-dimensional.",
-              "PCC": "Attuned to solving the situational issue; defines forward motion only in terms of physical action. Little co-creation.",
-              "MCC": "Complete partnership or lets client lead. Actions fit client's style and pace. Includes thinking, creating, and doing. Encourages experimentation."
-            },
-            "non_passing_criteria": {
-              "PCC": [
-                "Insists the client do what the coach has prescribed.",
-                "Homework has no clear relationship to agenda or purpose.",
-                "Tools/structures do not bear a relationship to the needs of the client.",
-                "Little or no co-creation."
-              ],
-              "MCC": [
-                "Does not invite full client participation or dominates the design of activities.",
-                "Activities do not reflect clear potential for forward learning.",
-                "Actions involve only physical activity with no attention to thinking, being, or creativity."
-              ]
-            }
-          },
-          {
-            "id": "competency10",
-            "title": "Planning and Goal Setting",
-            "definition": "Ability to develop and maintain an effective coaching plan with the client.",
-            "assessment_levels": {
-              "ACC": "Adopts goals at obvious level. Partial partnership. Coach sometimes substitutes expertise for client's.",
-              "PCC": "Attuned to situational issues; edits plans presented by client. Little/no partnership.",
-              "MCC": "Goals achieve more than just presenting concerns. Client leads or complete partnership. Broadening the scope of learning and growth."
-            },
-            "non_passing_criteria": {
-              "PCC": [
-                "Insists that client follow a prescribed plan familiar to the coach.",
-                "Unable to support the client in developing an effective plan.",
-                "Plan has no clear relationship to agenda or purpose.",
-                "Coach is the most significant voice in suggesting plans."
-              ],
-              "MCC": [
-                "Does not invite full client participation or dominates the creation of plans.",
-                "Plans do not reflect clear potential for forward learning.",
-                "Plans involve only physical activity with no attention to thinking, being, or creativity."
-              ]
-            }
-          },
-          {
-            "id": "competency11",
-            "title": "Managing Progress and Accountability",
-            "definition": "Ability to hold attention on what is important for the client, and to leave responsibility with the client to take action.",
-            "assessment_levels": {
-              "ACC": "Suggests forms of accountability that may feel parental. One dimensional.",
-              "PCC": "Some partnership, but methods often reflect coach training tools. Coach is often the most significant voice.",
-              "MCC": "Client determines own methods of accountability. Coach trusts client to be accountable and lovingly calls them to account if agreed movement doesn't occur."
-            },
-            "non_passing_criteria": {
-              "PCC": [
-                "Insists that client follow prescribed measures familiar to the coach.",
-                "Unable to support client in developing effective accountability.",
-                "Measures have no clear relationship to agenda or purpose.",
-                "Little or no partnership."
-              ],
-              "MCC": [
-                "Does not invite full client participation or dominates accountability mechanisms.",
-                "Coach is the most significant voice in setting accountability.",
-                "Methods do not have a clear purpose or relationship to agenda.",
-                "Does not encourage invention of structures by the client."
-              ]
-            }
+            "title": "Facilitates Client Growth",
+            "definition": "Partners with the client to transform learning and insight into action. Promotes client autonomy in the coaching process",
+            "instructions": [
+              "Works with the client to integrate new awareness, insight or learning into their worldview and behaviors",
+              "Partners with the client to design goals, actions and accountability measures that integrate and expand new learning",
+              "Acknowledges and supports client autonomy in the design of goals, actions and methods of accountability",
+              "Supports the client in identifying potential results or learning from identified action steps",
+              "Invites the client to consider how to move forward, including resources, support and potential barriers",
+              "Partners with the client to summarize learning and insight within or between sessions",
+              "Celebrates the client’s progress and successes",
+              "Partners with the client to close the session"
+            ]
           }
         ]
       },
@@ -458,7 +317,8 @@
       "standards": [
         "ICF Core Values",
         "ICF Code of Ethics (2025)",
-        "ICF CORE COMPETENCIES RATING LEVELS (11 Competencies)",
+        "Updated ICF Core Competencies (2019)",
+        "ICF CORE COMPETENCIES RATING LEVELS",
         "ICF Professional Certified Coach (PCC) Markers",
         "Referring a Client to Therapy: A Set of Guidelines (2018)"
       ]
