@@ -32,7 +32,7 @@ def save_file(folder_path: Path, filename: str, file_content: str):
 def save_transcript_as_text(folder_path: Path, filename: str, file_content: str):
     """
     transcribed_json: JSON string like
-      '{"transcription": [{"start": 0.0, "end": 8.08, "text": "..."}]}'
+      '{"transcription": [{"start": 0.0, "end": 8.08, "text": "...", "speaker": "SPEAKER_00"}]}'
     """
     data = json.loads(file_content)
     segments = data.get("transcription", [])
@@ -42,7 +42,8 @@ def save_transcript_as_text(folder_path: Path, filename: str, file_content: str)
         start = f"{s['start']:.2f}"
         end = f"{s['end']:.2f}"
         text = s["text"].strip()
-        lines.append(f"{start} - {end} | {text}")
+        speaker = s.get("speaker", "UNKNOWN")
+        lines.append(f"{start} - {end} | {speaker} | {text}")
 
     with open(filename, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))

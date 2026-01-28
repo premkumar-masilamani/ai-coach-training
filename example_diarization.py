@@ -33,13 +33,18 @@ def main():
 
     try:
         print("Initializing diarization service...")
-        print("Note: On first run, this will download the model (~1GB) if not cached locally.")
-        print("Subsequent runs will be completely offline.\n")
 
-        # Initialize the diarizer
-        # The HF_TOKEN can be set as an environment variable or passed directly
-        # For first-time download only: export HF_TOKEN="your_hugging_face_token"
-        diarizer = Diarizer()
+        # Check if we should run in offline mode
+        is_offline = os.getenv('OFFLINE_MODE', 'false').lower() == 'true'
+
+        if is_offline:
+            print("Running in OFFLINE mode.")
+            diarizer = Diarizer(offline=True)
+        else:
+            print("Note: On first run, this will download the model (~1GB) if not cached locally.")
+            print("Subsequent runs can be run in offline mode by setting OFFLINE_MODE=true.\n")
+            # Initialize the diarizer and allow downloads
+            diarizer = Diarizer(offline=False)
 
         if diarizer.pipeline is None:
             print("Failed to initialize diarization pipeline.")
