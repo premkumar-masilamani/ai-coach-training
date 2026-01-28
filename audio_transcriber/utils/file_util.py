@@ -42,13 +42,9 @@ def save_transcript_as_text(folder_path: Path, filename: Path, file_content: str
 
     lines = []
     for s in segments:
-<<<<<<< HEAD
         lines.append(
             f"{format_timestamp(s['start'])} - {format_timestamp(s['end'])} | {s['text'].strip()}"
         )
-=======
-        lines.append(f"{format_timestamp(s['start'])} - {format_timestamp(s['end'])} | {s["text"].strip()}")
->>>>>>> db32b347b496456151b79d832a991b373fd3d6f1
 
     with open(filename, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))

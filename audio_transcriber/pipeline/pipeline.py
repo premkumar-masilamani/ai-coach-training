@@ -5,15 +5,11 @@ from audio_transcriber.alignment.aligner import Aligner
 from audio_transcriber.conversion.audio_converter import convert_audio
 from audio_transcriber.diarization.diarizer import Diarizer
 from audio_transcriber.transcription.transcriber import Transcriber
-<<<<<<< HEAD
 from audio_transcriber.utils.file_util import (
     get_audio_files_list,
     save_file,
     save_transcript_as_text,
 )
-=======
-from audio_transcriber.utils.file_util import get_audio_files_list, save_file, save_transcript_as_text
->>>>>>> db32b347b496456151b79d832a991b373fd3d6f1
 
 logger = logging.getLogger()
 
@@ -32,10 +28,6 @@ class TranscriptionPipeline:
             return
 
         for audio_file in audio_files_list:
-<<<<<<< HEAD
-=======
-
->>>>>>> db32b347b496456151b79d832a991b373fd3d6f1
             # TODO: Audio Conversion
             converted_audio_file = convert_audio(audio_file)
 
@@ -43,7 +35,6 @@ class TranscriptionPipeline:
             transcribed_json = self.transcriber.transcribe(converted_audio_file)
             # TODO: Move to Save Section
             if transcribed_json:
-<<<<<<< HEAD
                 transcript_txt_filename = audio_file.with_name(
                     audio_file.stem + "_transcript.txt"
                 )
@@ -58,20 +49,11 @@ class TranscriptionPipeline:
                 logging.info(
                     f"Transcript {transcript_json_filename} saved for {audio_file}"
                 )
-=======
-                transcript_txt_filename = audio_file.with_name(audio_file.stem + "_transcript.txt")
-                save_transcript_as_text(self.input_dir, transcript_txt_filename, transcribed_json)
-
-                transcript_json_filename = audio_file.with_name(audio_file.stem + "_transcript.json")
-                save_file(self.input_dir, transcript_json_filename, transcribed_json)
-                logging.info(f"Transcript {transcript_json_filename} saved for {audio_file}")
->>>>>>> db32b347b496456151b79d832a991b373fd3d6f1
 
             # Diarize
             diarized_json = self.diarizer.diarize(converted_audio_file)
             # TODO: Move to Save Section
             if diarized_json:
-<<<<<<< HEAD
                 diarized_json_filename = audio_file.with_name(
                     audio_file.stem + "_diarized.json"
                 )
@@ -79,11 +61,6 @@ class TranscriptionPipeline:
                 logging.info(
                     f"Diarization {diarized_json_filename} saved for {audio_file}"
                 )
-=======
-                diarized_json_filename = audio_file.with_name(audio_file.stem + "_diarized.json")
-                save_file(self.input_dir, diarized_json_filename, diarized_json)
-                logging.info(f"Diarization {diarized_json_filename} saved for {audio_file}")
->>>>>>> db32b347b496456151b79d832a991b373fd3d6f1
 
             # TODO: Align
             # final_transcript = self.aligner.align(transcribed_json, diarized_json)
