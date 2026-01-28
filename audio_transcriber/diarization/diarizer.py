@@ -1,23 +1,29 @@
+import json
 import logging
 import json
 import os
-import time
 import tempfile
+import time
 from pathlib import Path
 from typing import Optional, Tuple
+
 import torch
+from huggingface_hub import snapshot_download
 from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
-from huggingface_hub import snapshot_download
 
-from audio_transcriber.utils.constants import DEFAULT_DEVICE_CPU
+from audio_transcriber.utils.constants import AI_MODEL_PATH
 from audio_transcriber.utils.time_util import format_timestamp
 from audio_transcriber.utils.constants import AI_MODEL_PATH
 
 logger = logging.getLogger(__name__)
 
-class Diarizer:
 
+class Diarizer:
+<<<<<<< HEAD
+
+=======
+>>>>>>> db32b347b496456151b79d832a991b373fd3d6f1
     model_repo: str = "pyannote/speaker-diarization-3.1"
     model_path: Path = AI_MODEL_PATH / model_repo
     pipeline: Optional[Pipeline] = None
@@ -295,9 +301,9 @@ class Diarizer:
             cmd = [
                 'ffmpeg', '-i', audio_path,
                 '-acodec', 'pcm_s16le',  # 16-bit PCM
-                '-ar', '16000',          # 16kHz sample rate
-                '-ac', '1',              # Mono
-                '-y',                    # Overwrite output file
+                '-ar', '16000',  # 16kHz sample rate
+                '-ac', '1',  # Mono
+                '-y',  # Overwrite output file
                 temp_wav_path
             ]
 
@@ -406,6 +412,52 @@ class Diarizer:
             logger.error(f"Error formatting diarization output: {e}", exc_info=True)
             return "Error formatting diarization results."
 
+    def diarize(self, audio_path: Path):
+        """Perform speaker diarization on the given audio file.
+
+        Args:
+            audio_path (str): Path to the audio file to diarize.
+
+        Returns:
+            Diarization result with speaker segments or None if diarization fails.
+        """
+        logger.info(f"Diarization process started for: {audio_path}")
+        start_time = time.time()
+
+        if self.pipeline is None:
+            logger.error("Diarization pipeline is not available. Model may not be loaded correctly.")
+            return None
+
+        logger.info("Diarization pipeline is available.")
+
+        # Convert audio format if needed
+        # TODO: Move this to pre-processing
+        converted_audio_path, is_temporary = self._convert_audio_format(audio_path)
+        logger.info(f"Starting diarization for: {audio_path}")
+        if converted_audio_path != audio_path:
+            logger.info(f"Using converted audio file: {converted_audio_path}")
+
+        try:
+            logger.info("Applying diarization pipeline...")
+            # Perform diarization with progress tracking
+            with ProgressHook() as hook:
+                diarization = self.pipeline(converted_audio_path, hook=hook)
+                logger.debug(f"Diarization result: {diarization}")
+
+            logger.info("Diarization pipeline applied successfully.")
+            formatted_output = self._format_diarization_output(diarization)
+            logger.info(f"Diarization completed in {time.time() - start_time:.2f} seconds for: {audio_path}")
+            return formatted_output
+        except Exception as e:
+            logger.error(f"Error during diarization of {audio_path}: {e}", exc_info=True)
+            return None
+        finally:
+            if is_temporary and converted_audio_path and os.path.exists(converted_audio_path):
+                try:
+                    os.remove(converted_audio_path)
+                    logger.info(f"Removed temporary audio file: {converted_audio_path}")
+                except OSError as e:
+                    logger.error(f"Error removing temporary file {converted_audio_path}: {e}")
 
     def diarize(self, audio_path: Path):
         """Perform speaker diarization on the given audio file.
