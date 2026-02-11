@@ -1,10 +1,9 @@
 import logging
 from pathlib import Path
 
-from audio_transcriber.diarization.diarizer import Diarizer
-from audio_transcriber.preprocessing.audio_preprocessor import preprocess_audio
-from audio_transcriber.transcription.transcriber import Transcriber
-from audio_transcriber.utils.file_util import (
+from transcriber.preprocessing.audio_preprocessor import preprocess_audio
+from transcriber.transcription.transcriber import Transcriber
+from transcriber.utils.file_util import (
     load_audio_files,
     save_file,
     save_transcript_as_text,
@@ -17,7 +16,6 @@ class TranscriptionPipeline:
     def __init__(self, input_dir: Path):
         self.input_dir = input_dir
         self.transcriber = Transcriber()
-        self.diarizer = Diarizer()
 
     def run(self):
         pending_files = load_audio_files(self.input_dir)
@@ -32,12 +30,6 @@ class TranscriptionPipeline:
             # Transcribe
             transcribed_json = self.transcriber.transcribe(processed_audio_file)
             # save_file(self.input_dir, transcript_file, transcribed_json)
-
-            # Diarize
-            # segments = self.diarizer.diarize(processed_audio_file)
-
-            # Align
-            # final_transcript = align_transcript(transcript, segments)
 
             # Save
             if transcribed_json:

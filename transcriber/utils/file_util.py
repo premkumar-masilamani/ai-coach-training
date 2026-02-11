@@ -5,8 +5,28 @@ from pathlib import Path
 
 logger = logging.getLogger()
 
-# --- Supported audio extensions ---
-audio_extensions = {".mp3", ".wav", ".m4a", ".flac", ".aac", ".ogg"}
+# --- Supported audio/video extensions ---
+audio_extensions = {
+    ".aac",
+    ".aiff",
+    ".alac",
+    ".flac",
+    ".m4a",
+    ".mp3",
+    ".ogg",
+    ".opus",
+    ".wav",
+    ".wma",
+    ".avi",
+    ".m4v",
+    ".mkv",
+    ".mov",
+    ".mp4",
+    ".mpeg",
+    ".mpg",
+    ".webm",
+    ".wmv",
+}
 
 
 def load_audio_files(folder_path: Path):

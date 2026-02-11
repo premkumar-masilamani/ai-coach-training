@@ -7,10 +7,10 @@ from typing import Optional
 from faster_whisper import WhisperModel
 from huggingface_hub import snapshot_download
 
-from audio_transcriber.utils.constants import AI_MODEL_PATH
-from audio_transcriber.utils.constants import DEFAULT_COMPUTE_TYPE
-from audio_transcriber.utils.constants import DEFAULT_DEVICE_CPU
-from audio_transcriber.utils.constants import DEFAULT_LANGUAGE
+from transcriber.utils.constants import AI_MODEL_PATH
+from transcriber.utils.constants import DEFAULT_COMPUTE_TYPE
+from transcriber.utils.constants import DEFAULT_DEVICE_CPU
+from transcriber.utils.constants import DEFAULT_LANGUAGE
 
 logger = logging.getLogger(__name__)
 

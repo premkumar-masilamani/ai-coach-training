@@ -2,7 +2,7 @@ import logging
 import argparse
 import sys
 from pathlib import Path
-from audio_transcriber.pipeline.pipeline import TranscriptionPipeline
+from transcriber.pipeline.pipeline import TranscriptionPipeline
 
 logger = logging.getLogger()
 

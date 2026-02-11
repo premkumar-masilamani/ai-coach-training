@@ -12,4 +12,4 @@ ai_models/
 __pycache__/
 
 # Audio files
-*.m4a
+audio_files/
