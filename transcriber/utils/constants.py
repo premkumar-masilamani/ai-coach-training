@@ -1,7 +1,7 @@
 from pathlib import Path
 
 AI_MODEL_PATH = Path("ai_models")
-AI_MODEL_REPO = "guillaumekln/faster-whisper-medium"
+AI_MODEL_FASTER_WHISPER_MEDIUM_REPO = "guillaumekln/faster-whisper-medium"
 AI_MODEL_CONFIG = "config.json"
 FFMPEG_PATH = Path("tools") / "ffmpeg"
 FFMPEG_URL_WINDOWS = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"

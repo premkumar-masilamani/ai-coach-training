@@ -9,7 +9,7 @@ from huggingface_hub import snapshot_download
 
 from transcriber.utils.constants import AI_MODEL_CONFIG
 from transcriber.utils.constants import AI_MODEL_PATH
-from transcriber.utils.constants import AI_MODEL_REPO
+from transcriber.utils.constants import AI_MODEL_FASTER_WHISPER_MEDIUM_REPO
 from transcriber.utils.constants import DEFAULT_LANGUAGE
 from transcriber.utils.device_util import select_device_and_compute_type
 from transcriber.utils.time_util import format_timestamp
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class Transcriber():
 
-    model_repo: str = AI_MODEL_REPO
+    model_repo: str = AI_MODEL_FASTER_WHISPER_MEDIUM_REPO
     model_path: Path = AI_MODEL_PATH / model_repo
 
     def __init__(self):
