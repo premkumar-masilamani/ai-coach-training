@@ -12,4 +12,9 @@ ai_models/
 __pycache__/
 
 # Audio files
-audio_files/
+*.m4a
+*.wav
+
+# Softwares
+ffmpeg
+ffmpeg.exe

@@ -59,8 +59,16 @@ def save_transcript_as_text(folder_path: Path, filename: str, file_content: str)
 
     lines = []
     for s in segments:
-        start = f"{s['start']:.2f}"
-        end = f"{s['end']:.2f}"
+        start_val = s.get("start")
+        end_val = s.get("end")
+        if isinstance(start_val, (int, float)):
+            start = f"{start_val:.2f}"
+        else:
+            start = str(start_val)
+        if isinstance(end_val, (int, float)):
+            end = f"{end_val:.2f}"
+        else:
+            end = str(end_val)
         text = s["text"].strip()
         lines.append(f"{start} - {end} | {text}")
 

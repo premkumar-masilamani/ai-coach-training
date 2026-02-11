@@ -1,5 +1,3 @@
-INPUT_DIR = ./audio_files/
-
 .PHONY: setup
 setup:
 	@echo "Creating virtual environment..."
@@ -12,4 +10,4 @@ show:
 
 .PHONY: run
 run:
-	pipenv run python -m transcriber.main -v -i $(INPUT_DIR)
+	pipenv run python -m transcriber.main -v

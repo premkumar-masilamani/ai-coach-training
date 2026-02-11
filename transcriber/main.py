@@ -2,7 +2,9 @@ import logging
 import argparse
 import sys
 from pathlib import Path
+
 from transcriber.pipeline.pipeline import TranscriptionPipeline
+from transcriber.utils.constants import DEFAULT_INPUT_DIR
 
 logger = logging.getLogger()
 
@@ -18,9 +20,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "-i",
         "--input-dir",
-        required=True,
+        default=DEFAULT_INPUT_DIR,
         type=Path,
-        help="Directory containing audio files",
+        help=f"Directory containing audio files (default: {DEFAULT_INPUT_DIR})",
     )
     parser.add_argument(
         "-v",
