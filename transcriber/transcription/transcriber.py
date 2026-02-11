@@ -216,6 +216,7 @@ class Transcriber:
         if not built:
             self._report("tool.binary", "Failed", str(WHISPER_CPP_LOCAL_BIN))
             return
+
         self._report("tool.binary", "Ready", str(WHISPER_CPP_LOCAL_BIN))
 
     def _download_default_model(self, destination: Path):

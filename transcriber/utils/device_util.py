@@ -34,7 +34,7 @@ def select_device_and_compute_type() -> Tuple[str, str]:
 
             if torch.backends.mps.is_available():
                 logger.info(
-                    "Metal/MPS detected, but faster-whisper uses CTranslate2 which only "
+                    "Metal/MPS detected, but CTranslate2 backend in this code path only "
                     "supports CPU/CUDA. Falling back to CPU."
                 )
                 device = "cpu"

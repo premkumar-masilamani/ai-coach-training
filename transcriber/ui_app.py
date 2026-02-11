@@ -6,12 +6,18 @@ from pathlib import Path
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from transcriber.preprocessing.audio_preprocessor import preprocess_audio
+from transcriber.preprocessing.audio_preprocessor import (
+    prepare_audio_for_transcription,
+)
 from transcriber.transcription.transcriber import Transcriber
 from transcriber.utils.constants import AI_MODEL_WHISPER_CPP_DEFAULT_MODEL
 from transcriber.utils.constants import WHISPER_CPP_LOCAL_BIN
 from transcriber.utils.constants import WHISPER_CPP_PATH
-from transcriber.utils.file_util import audio_extensions, save_transcript_as_text
+from transcriber.utils.file_util import (
+    audio_extensions,
+    has_original_pair_for_preprocessed,
+    save_transcript_as_text,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -184,7 +190,9 @@ class Worker(QtCore.QThread):
                 continue
             try:
                 self.itemStatus.emit(path, 20, "Preprocessing")
-                processed = preprocess_audio(path, stop_event=self._stop_event)
+                processed = prepare_audio_for_transcription(
+                    path, stop_event=self._stop_event
+                )
                 self.itemStatus.emit(path, 65, "Transcribing")
                 transcribed_json = transcriber.transcribe(
                     processed, stop_event=self._stop_event
@@ -506,9 +514,13 @@ class TranscriberWindow(QtWidgets.QMainWindow):
             if path.is_dir():
                 for file_path in path.rglob("*"):
                     if file_path.is_file() and file_path.suffix.lower() in audio_extensions:
+                        if has_original_pair_for_preprocessed(file_path):
+                            continue
                         added += self._add_item(file_path)
             elif path.is_file():
                 if path.suffix.lower() in audio_extensions:
+                    if has_original_pair_for_preprocessed(path):
+                        continue
                     added += self._add_item(path)
 
         if added == 0:

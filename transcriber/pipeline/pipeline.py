@@ -1,7 +1,9 @@
 import logging
 from pathlib import Path
 
-from transcriber.preprocessing.audio_preprocessor import preprocess_audio
+from transcriber.preprocessing.audio_preprocessor import (
+    prepare_audio_for_transcription,
+)
 from transcriber.transcription.transcriber import Transcriber
 from transcriber.utils.file_util import (
     load_audio_files,
@@ -24,8 +26,7 @@ class TranscriptionPipeline:
             return
 
         for audio_file, transcript_file in pending_files:
-            # Preprocess
-            processed_audio_file = preprocess_audio(audio_file)
+            processed_audio_file = prepare_audio_for_transcription(audio_file)
 
             # Transcribe
             transcribed_json = self.transcriber.transcribe(processed_audio_file)

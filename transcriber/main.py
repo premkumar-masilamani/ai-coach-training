@@ -15,7 +15,7 @@ def main(input_dir: Path):
 if __name__ == "__main__":
     # --- Parse Arguments ---
     parser = argparse.ArgumentParser(
-        description="Batch transcribe audio files using faster-whisper."
+        description="Batch transcribe audio files using whisper.cpp."
     )
     parser.add_argument(
         "-i",

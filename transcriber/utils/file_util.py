@@ -29,16 +29,52 @@ audio_extensions = {
 }
 
 
+def is_preprocessed_whisper_audio(file: Path) -> bool:
+    return file.suffix.lower() == ".wav" and file.stem.endswith(".whisper")
+
+
+def has_original_pair_for_preprocessed(file: Path) -> bool:
+    if not is_preprocessed_whisper_audio(file):
+        return False
+
+    base_stem = file.stem[: -len(".whisper")]
+    for ext in audio_extensions:
+        candidate = file.with_name(f"{base_stem}{ext}")
+        if candidate != file and candidate.exists():
+            return True
+    return False
+
+
+def transcript_path_for_audio(file: Path) -> Path:
+    if is_preprocessed_whisper_audio(file):
+        base_stem = file.stem[: -len(".whisper")]
+        return file.with_name(f"{base_stem}.txt")
+    return file.with_suffix(".txt")
+
+
 def load_audio_files(folder_path: Path):
     # --- Find audio files to transcribe (recursively) ---
     pending_files = []
+    seen_transcripts: set[Path] = set()
     for file in folder_path.rglob("*"):
         if file.suffix.lower() in audio_extensions and file.is_file():
-            transcript_file = file.with_suffix(".txt")
+            if has_original_pair_for_preprocessed(file):
+                logging.info(
+                    "Skipping paired preprocessed file: %s (original exists)",
+                    file,
+                )
+                continue
+
+            transcript_file = transcript_path_for_audio(file)
+            if transcript_file in seen_transcripts:
+                logging.info("Skipping duplicate transcript target for %s", file)
+                continue
+
             if transcript_file.exists():
                 logging.info(f"Skipping. Transcript already exists: {transcript_file}")
             else:
                 pending_files.append((file, transcript_file))
+                seen_transcripts.add(transcript_file)
 
     return pending_files
 

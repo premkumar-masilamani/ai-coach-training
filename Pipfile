@@ -5,7 +5,6 @@ name = "pypi"
 
 [packages]
 torch = "*"
-faster-whisper = "*"
 "pyannote.audio" = "*"
 huggingface-hub = "*"
 pydub = "*"

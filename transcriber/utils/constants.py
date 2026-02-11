@@ -1,8 +1,6 @@
 from pathlib import Path
 
 AI_MODEL_PATH = Path("ai_models")
-AI_MODEL_FASTER_WHISPER_MEDIUM_REPO = "guillaumekln/faster-whisper-medium"
-AI_MODEL_CONFIG = "config.json"
 AI_MODEL_WHISPER_CPP_PATH = AI_MODEL_PATH / "whisper.cpp"
 AI_MODEL_WHISPER_CPP_DEFAULT_MODEL = AI_MODEL_WHISPER_CPP_PATH / "ggml-base.en.bin"
 AI_MODEL_WHISPER_CPP_DEFAULT_MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
