@@ -8,9 +8,9 @@ from faster_whisper import WhisperModel
 from huggingface_hub import snapshot_download
 
 from transcriber.utils.constants import AI_MODEL_PATH
-from transcriber.utils.constants import DEFAULT_COMPUTE_TYPE
-from transcriber.utils.constants import DEFAULT_DEVICE_CPU
 from transcriber.utils.constants import DEFAULT_LANGUAGE
+from transcriber.utils.device_util import select_device_and_compute_type
+from transcriber.utils.time_util import format_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,10 @@ class Transcriber():
         self.model: Optional[WhisperModel] = None
 
         start_load = time.time()
-        logger.info(f"Using model path: {self.model_path} on device: {DEFAULT_DEVICE_CPU} with compute_type: {DEFAULT_COMPUTE_TYPE}")
+        device, compute_type = select_device_and_compute_type()
+        logger.info(
+            f"Using model path: {self.model_path} on device: {device} with compute_type: {compute_type}"
+        )
 
         # Check if model exists locally
         if not (self.model_path / "config.json").is_file():
@@ -49,8 +52,8 @@ class Transcriber():
         try:
             model = WhisperModel(
                 str(self.model_path),
-                device=DEFAULT_DEVICE_CPU,
-                compute_type=DEFAULT_COMPUTE_TYPE
+                device=device,
+                compute_type=compute_type,
             )
             self.model = model
         except Exception as e:
@@ -71,11 +74,13 @@ class Transcriber():
             segments, _ = self.model.transcribe(str(audio_file), language=DEFAULT_LANGUAGE)
             lines = []
             for s in segments:
-                lines.append({
-                    "start": s.start,
-                    "end": s.end,
-                    "text": s.text.strip(),
-                })
+                lines.append(
+                    {
+                        "start": format_timestamp(s.start),
+                        "end": format_timestamp(s.end),
+                        "text": s.text.strip(),
+                    }
+                )
             transcribed_json = {"transcription": lines}
         except Exception as e:
             logging.error(f"Failed to transcribe {audio_file}: {e}")

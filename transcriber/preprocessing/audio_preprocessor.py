@@ -1,7 +1,8 @@
 import logging
-import shutil
 import subprocess
 from pathlib import Path
+
+from transcriber.preprocessing.ffmpeg_util import get_local_ffmpeg_path
 
 logger = logging.getLogger()
 
@@ -14,11 +15,7 @@ def preprocess_audio(audio_file: Path) -> Path:
     if not audio_file.exists():
         raise FileNotFoundError(f"Input file does not exist: {audio_file}")
 
-    ffmpeg_path = shutil.which("ffmpeg")
-    if ffmpeg_path is None:
-        raise RuntimeError(
-            "ffmpeg is required for preprocessing but was not found on PATH."
-        )
+    ffmpeg_path = get_local_ffmpeg_path()
 
     output_file = audio_file.with_suffix("").with_suffix(".whisper.wav")
 
@@ -32,7 +29,7 @@ def preprocess_audio(audio_file: Path) -> Path:
     logger.info(f"Preprocessing {audio_file} -> {output_file}")
 
     command = [
-        ffmpeg_path,
+        str(ffmpeg_path),
         "-y",
         "-i",
         str(audio_file),
