@@ -11,3 +11,7 @@ show:
 .PHONY: run
 run:
 	pipenv run python -m transcriber.main -v
+
+.PHONY: ui
+ui:
+	pipenv run python -m transcriber.ui_app

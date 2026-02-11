@@ -1,95 +1,311 @@
 import json
 import logging
+import shutil
+import subprocess
+import tempfile
 import time
+import urllib.request
 from pathlib import Path
-from typing import Optional
+from threading import Event
+from typing import Callable, Optional
 
-from faster_whisper import WhisperModel
-from huggingface_hub import snapshot_download
-
-from transcriber.utils.constants import AI_MODEL_CONFIG
-from transcriber.utils.constants import AI_MODEL_PATH
-from transcriber.utils.constants import AI_MODEL_FASTER_WHISPER_MEDIUM_REPO
 from transcriber.utils.constants import DEFAULT_LANGUAGE
-from transcriber.utils.device_util import select_device_and_compute_type
+from transcriber.utils.constants import AI_MODEL_WHISPER_CPP_DEFAULT_MODEL
+from transcriber.utils.constants import AI_MODEL_WHISPER_CPP_DEFAULT_MODEL_URL
+from transcriber.utils.constants import WHISPER_CPP_LOCAL_BIN
+from transcriber.utils.constants import WHISPER_CPP_LOCAL_LEGACY_BIN
+from transcriber.utils.constants import WHISPER_CPP_PATH
+from transcriber.utils.constants import WHISPER_CPP_REPO_MODEL
 from transcriber.utils.time_util import format_timestamp
 
 logger = logging.getLogger(__name__)
 
-class Transcriber():
 
-    model_repo: str = AI_MODEL_FASTER_WHISPER_MEDIUM_REPO
-    model_path: Path = AI_MODEL_PATH / model_repo
+def _parse_timestamp_to_seconds(raw: str) -> float:
+    text = raw.strip()
+    if not text:
+        return 0.0
+    text = text.replace(",", ".")
+    parts = text.split(":")
+    if len(parts) != 3:
+        return 0.0
+    hours = float(parts[0])
+    minutes = float(parts[1])
+    seconds = float(parts[2])
+    return (hours * 3600.0) + (minutes * 60.0) + seconds
 
-    def __init__(self):
 
-        self.model: Optional[WhisperModel] = None
+def _extract_segments(payload: dict) -> list[dict]:
+    segments = payload.get("transcription")
+    if not isinstance(segments, list):
+        segments = payload.get("segments")
+    if not isinstance(segments, list):
+        result = payload.get("result")
+        if isinstance(result, dict):
+            segments = result.get("segments")
+    if not isinstance(segments, list):
+        return []
 
-        start_load = time.time()
-        device, compute_type = select_device_and_compute_type()
-        logger.info(
-            f"Using model path: {self.model_path} on device: {device} with compute_type: {compute_type}"
+    lines = []
+    for segment in segments:
+        if not isinstance(segment, dict):
+            continue
+        text = str(segment.get("text", "")).strip()
+        if not text:
+            continue
+
+        start_raw = segment.get("start")
+        end_raw = segment.get("end")
+
+        if isinstance(start_raw, (int, float)) and isinstance(end_raw, (int, float)):
+            start_sec = float(start_raw)
+            end_sec = float(end_raw)
+        else:
+            offsets = segment.get("offsets", {})
+            if isinstance(offsets, dict):
+                from_ms = offsets.get("from")
+                to_ms = offsets.get("to")
+                if isinstance(from_ms, (int, float)) and isinstance(to_ms, (int, float)):
+                    start_sec = float(from_ms) / 1000.0
+                    end_sec = float(to_ms) / 1000.0
+                else:
+                    timestamps = segment.get("timestamps", {})
+                    start_sec = _parse_timestamp_to_seconds(str(timestamps.get("from", "")))
+                    end_sec = _parse_timestamp_to_seconds(str(timestamps.get("to", "")))
+            else:
+                start_sec = 0.0
+                end_sec = 0.0
+
+        lines.append(
+            {
+                "start": format_timestamp(start_sec),
+                "end": format_timestamp(end_sec),
+                "text": text,
+            }
         )
 
-        # Check if model exists locally
-        if not (self.model_path / AI_MODEL_CONFIG).is_file():
-            logging.info("Model not found locally, starting download...")
-            logging.warning(
-                "This is a large model and may take a long time to download."
-            )
-            self.model_path.mkdir(parents=True, exist_ok=True)
-            logging.info(f"Downloading from Hugging Face Hub: {self.model_repo}")
-            try:
-                snapshot_download(
-                    repo_id=self.model_repo,
-                    local_dir=str(self.model_path),
-                    local_dir_use_symlinks=False,
-                )
-            except Exception as e:
-                logging.error(f"Failed to download model: {e}")
-            logging.info("Model download complete.")
+    return lines
+
+
+class Transcriber:
+    def __init__(self, progress_cb: Optional[Callable[[str, str, str], None]] = None):
+        self.model_path: Path = AI_MODEL_WHISPER_CPP_DEFAULT_MODEL
+        self.repo_path: Path = WHISPER_CPP_PATH
+        self.progress_cb = progress_cb
+        if self.repo_path.exists():
+            self._report("tool.repo", "Ready", str(self.repo_path))
         else:
-            logging.info("Model found in local cache.")
+            self._report("tool.repo", "Missing", str(self.repo_path))
+        self.binary_path: Optional[str] = self._resolve_whisper_cpp_binary()
 
-        try:
-            model = WhisperModel(
-                str(self.model_path),
-                device=device,
-                compute_type=compute_type,
+        if not self.binary_path:
+            self._report("tool.repo", "Checking", str(self.repo_path))
+            self._report("tool.binary", "Missing", str(WHISPER_CPP_LOCAL_BIN))
+            logger.info("whisper.cpp binary not found. Bootstrapping whisper.cpp on first run.")
+            self._bootstrap_whisper_cpp()
+            self.binary_path = self._resolve_whisper_cpp_binary()
+
+        if not self.binary_path:
+            logger.error(
+                "whisper.cpp bootstrap failed. Expected binary at %s or in PATH.",
+                WHISPER_CPP_LOCAL_BIN,
             )
-            self.model = model
-        except Exception as e:
-            logging.error(f"Failed to load model from {self.model_path}: {e}")
+            self._report("tool.binary", "Failed", str(WHISPER_CPP_LOCAL_BIN))
+        else:
+            logger.info("Using whisper.cpp binary: %s", self.binary_path)
+            self._report("tool.binary", "Ready", self.binary_path)
 
-        logging.info(f"Model from '{self.model_path}' loaded in {time.time() - start_load:.2f} seconds.")
+        if not self.model_path.is_file() and WHISPER_CPP_REPO_MODEL.is_file():
+            self.model_path = WHISPER_CPP_REPO_MODEL
 
+        if not self.model_path.is_file():
+            self._report("model.default", "Missing", str(self.model_path))
+            logger.info("whisper.cpp model not found. Downloading default model on first run.")
+            self._download_default_model(self.model_path)
 
-    def transcribe(self, audio_file: Path) -> Optional[str]:
-        if self.model is None:
-            logging.error("Model is not loaded")
+        if not self.model_path.is_file() and WHISPER_CPP_REPO_MODEL.is_file():
+            self.model_path = WHISPER_CPP_REPO_MODEL
+
+        if self.model_path.is_file():
+            logger.info("Using whisper.cpp model: %s", self.model_path)
+            self._report("model.default", "Ready", str(self.model_path))
+        else:
+            logger.error("Failed to obtain whisper.cpp model file.")
+            self._report("model.default", "Failed", str(self.model_path))
+
+    def _report(self, item_id: str, status: str, path_text: str):
+        if self.progress_cb:
+            try:
+                self.progress_cb(item_id, status, path_text)
+            except Exception:
+                logger.debug("Progress callback failed for %s", item_id)
+
+    def _resolve_whisper_cpp_binary(self) -> Optional[str]:
+        if WHISPER_CPP_LOCAL_BIN.is_file():
+            return str(WHISPER_CPP_LOCAL_BIN)
+        if WHISPER_CPP_LOCAL_LEGACY_BIN.is_file():
+            return str(WHISPER_CPP_LOCAL_LEGACY_BIN)
+        from_path = shutil.which("whisper-cli")
+        if from_path:
+            return from_path
+        legacy = shutil.which("main")
+        if legacy:
+            return legacy
+        return None
+
+    def _run_command(self, command: list[str], cwd: Optional[Path] = None) -> bool:
+        try:
+            subprocess.run(
+                command,
+                cwd=str(cwd) if cwd else None,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            return True
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or "").strip()
+            stdout = (exc.stdout or "").strip()
+            details = stderr or stdout or str(exc)
+            logger.error("Command failed: %s\n%s", " ".join(command), details)
+            return False
+        except Exception as exc:
+            logger.error("Command error: %s (%s)", " ".join(command), exc)
+            return False
+
+    def _bootstrap_whisper_cpp(self):
+        git_bin = shutil.which("git")
+        cmake_bin = shutil.which("cmake")
+        if not git_bin:
+            logger.error("Cannot bootstrap whisper.cpp: `git` is not installed.")
+            self._report("tool.repo", "Failed", str(self.repo_path))
+            return
+        if not cmake_bin:
+            logger.error("Cannot bootstrap whisper.cpp: `cmake` is not installed.")
+            self._report("tool.binary", "Failed", str(WHISPER_CPP_LOCAL_BIN))
+            return
+
+        if not self.repo_path.exists():
+            self.repo_path.parent.mkdir(parents=True, exist_ok=True)
+            self._report("tool.repo", "Downloading", str(self.repo_path))
+            logger.info("Cloning whisper.cpp into %s", self.repo_path)
+            ok = self._run_command(
+                [git_bin, "clone", "--depth", "1", "https://github.com/ggml-org/whisper.cpp.git", str(self.repo_path)]
+            )
+            if not ok:
+                self._report("tool.repo", "Failed", str(self.repo_path))
+                return
+            self._report("tool.repo", "Ready", str(self.repo_path))
+        else:
+            self._report("tool.repo", "Ready", str(self.repo_path))
+
+        self._report("tool.binary", "Building", str(WHISPER_CPP_LOCAL_BIN))
+        logger.info("Building whisper.cpp (Metal backend).")
+        configured = self._run_command(
+            [cmake_bin, "-S", ".", "-B", "build", "-DGGML_METAL=ON"],
+            cwd=self.repo_path,
+        )
+        if not configured:
+            self._report("tool.binary", "Failed", str(WHISPER_CPP_LOCAL_BIN))
+            return
+
+        built = self._run_command(
+            [cmake_bin, "--build", "build", "-j"],
+            cwd=self.repo_path,
+        )
+        if not built:
+            self._report("tool.binary", "Failed", str(WHISPER_CPP_LOCAL_BIN))
+            return
+        self._report("tool.binary", "Ready", str(WHISPER_CPP_LOCAL_BIN))
+
+    def _download_default_model(self, destination: Path):
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = destination.with_suffix(destination.suffix + ".tmp")
+        self._report("model.default", "Downloading", str(destination))
+        logger.info("Downloading whisper.cpp model to %s", destination)
+        try:
+            with urllib.request.urlopen(AI_MODEL_WHISPER_CPP_DEFAULT_MODEL_URL, timeout=120) as response:
+                with open(temp_path, "wb") as out:
+                    shutil.copyfileobj(response, out)
+            temp_path.replace(destination)
+            self._report("model.default", "Ready", str(destination))
+        except Exception as exc:
+            if temp_path.exists():
+                temp_path.unlink(missing_ok=True)
+            logger.error("Failed to download whisper.cpp model: %s", exc)
+            self._report("model.default", "Failed", str(destination))
+
+    def transcribe(self, audio_file: Path, stop_event: Optional[Event] = None) -> Optional[str]:
+        if stop_event and stop_event.is_set():
+            raise InterruptedError(f"Transcription canceled for {audio_file}")
+
+        if not self.binary_path:
+            logger.error("Cannot transcribe: whisper.cpp binary is not available.")
+            return None
+        if not self.model_path.is_file():
+            logger.error("Cannot transcribe: whisper.cpp model file is missing: %s", self.model_path)
             return None
 
-        logging.info(f"Transcribing: {audio_file}")
+        logger.info("Transcribing with whisper.cpp: %s", audio_file)
         start_transcribe = time.time()
 
-        try:
-            segments, _ = self.model.transcribe(str(audio_file), language=DEFAULT_LANGUAGE)
-            lines = []
-            for s in segments:
-                lines.append(
-                    {
-                        "start": format_timestamp(s.start),
-                        "end": format_timestamp(s.end),
-                        "text": s.text.strip(),
-                    }
-                )
-            transcribed_json = {"transcription": lines}
-        except Exception as e:
-            logging.error(f"Failed to transcribe {audio_file}: {e}")
-            return None
+        with tempfile.TemporaryDirectory(prefix="whispercpp_") as temp_dir:
+            output_base = Path(temp_dir) / "transcript"
+            command = [
+                self.binary_path,
+                "-m",
+                str(self.model_path),
+                "-f",
+                str(audio_file),
+                "-l",
+                DEFAULT_LANGUAGE,
+                "-oj",
+                "-of",
+                str(output_base),
+            ]
 
-        logging.info(
-            f"Transcription completed in {time.time() - start_transcribe:.2f} seconds."
+            process = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+            while process.poll() is None:
+                if stop_event and stop_event.is_set():
+                    process.terminate()
+                    try:
+                        process.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait()
+                    raise InterruptedError(f"Transcription canceled for {audio_file}")
+                time.sleep(0.1)
+
+            stdout, stderr = process.communicate()
+            if process.returncode != 0:
+                details = (stderr or stdout or "Unknown error").strip()
+                logger.error("whisper.cpp failed for %s: %s", audio_file, details)
+                return None
+
+            json_output = output_base.with_suffix(".json")
+            if not json_output.is_file():
+                logger.error("whisper.cpp did not produce JSON output for %s", audio_file)
+                return None
+
+            try:
+                payload = json.loads(json_output.read_text(encoding="utf-8"))
+            except Exception as exc:
+                logger.error("Failed to parse whisper.cpp JSON output for %s: %s", audio_file, exc)
+                return None
+
+            segments = _extract_segments(payload)
+            if not segments:
+                logger.warning("No segments found in whisper.cpp output for %s", audio_file)
+                return None
+
+        logger.info(
+            "Transcription completed in %.2f seconds.",
+            time.time() - start_transcribe,
         )
-
-        return json.dumps(transcribed_json)
+        return json.dumps({"transcription": segments})
