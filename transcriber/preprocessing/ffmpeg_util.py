@@ -7,6 +7,13 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+from transcriber.utils.constants import FFMPEG_DEFAULT_ARCHIVE_NAME
+from transcriber.utils.constants import FFMPEG_PATH
+from transcriber.utils.constants import FFMPEG_URL_LINUX_AMD64
+from transcriber.utils.constants import FFMPEG_URL_LINUX_ARM64
+from transcriber.utils.constants import FFMPEG_URL_MACOS
+from transcriber.utils.constants import FFMPEG_URL_WINDOWS
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,26 +43,17 @@ def _detect_download_url(system: str, arch: str) -> tuple[str, str]:
     if system == "Windows":
         if arch not in {"amd64", "x86_64"}:
             raise RuntimeError(f"Unsupported Windows architecture: {arch}")
-        return (
-            "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
-            "ffmpeg.exe",
-        )
+        return (FFMPEG_URL_WINDOWS, "ffmpeg.exe")
 
     if system == "Darwin":
         # Evermeet provides macOS binaries via a stable download endpoint.
-        return ("https://evermeet.cx/ffmpeg/get/zip", "ffmpeg")
+        return (FFMPEG_URL_MACOS, "ffmpeg")
 
     if system == "Linux":
         if arch in {"aarch64", "arm64"}:
-            return (
-                "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz",
-                "ffmpeg",
-            )
+            return (FFMPEG_URL_LINUX_ARM64, "ffmpeg")
         if arch in {"amd64", "x86_64"}:
-            return (
-                "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz",
-                "ffmpeg",
-            )
+            return (FFMPEG_URL_LINUX_AMD64, "ffmpeg")
         raise RuntimeError(f"Unsupported Linux architecture: {arch}")
 
     raise RuntimeError(f"Unsupported OS: {system}")
@@ -63,7 +61,7 @@ def _detect_download_url(system: str, arch: str) -> tuple[str, str]:
 
 def get_local_ffmpeg_path() -> Path:
     base_dir = Path(__file__).resolve().parents[2]
-    bin_dir = base_dir / "tools" / "ffmpeg"
+    bin_dir = base_dir / FFMPEG_PATH
     bin_dir.mkdir(parents=True, exist_ok=True)
 
     system = platform.system()
@@ -76,7 +74,7 @@ def get_local_ffmpeg_path() -> Path:
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp_dir = Path(tmp)
-        archive_name = Path(url).name or "ffmpeg_download.zip"
+        archive_name = Path(url).name or FFMPEG_DEFAULT_ARCHIVE_NAME
         archive_path = tmp_dir / archive_name
         _download_file(url, archive_path)
         extracted = _extract_ffmpeg(binary_name, archive_path, tmp_dir)

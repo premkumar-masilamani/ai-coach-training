@@ -7,7 +7,9 @@ from typing import Optional
 from faster_whisper import WhisperModel
 from huggingface_hub import snapshot_download
 
+from transcriber.utils.constants import AI_MODEL_CONFIG
 from transcriber.utils.constants import AI_MODEL_PATH
+from transcriber.utils.constants import AI_MODEL_REPO
 from transcriber.utils.constants import DEFAULT_LANGUAGE
 from transcriber.utils.device_util import select_device_and_compute_type
 from transcriber.utils.time_util import format_timestamp
@@ -16,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class Transcriber():
 
-    model_repo: str = "guillaumekln/faster-whisper-medium"
+    model_repo: str = AI_MODEL_REPO
     model_path: Path = AI_MODEL_PATH / model_repo
 
     def __init__(self):
@@ -30,7 +32,7 @@ class Transcriber():
         )
 
         # Check if model exists locally
-        if not (self.model_path / "config.json").is_file():
+        if not (self.model_path / AI_MODEL_CONFIG).is_file():
             logging.info("Model not found locally, starting download...")
             logging.warning(
                 "This is a large model and may take a long time to download."
