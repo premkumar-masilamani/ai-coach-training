@@ -12,4 +12,4 @@ show:
 
 .PHONY: run
 run:
-	pipenv run python -m audio_transcriber.main -v -i $(INPUT_DIR)
+	pipenv run python -m transcriber.main -v -i $(INPUT_DIR)
