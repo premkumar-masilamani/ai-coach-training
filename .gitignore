@@ -16,6 +16,5 @@ __pycache__/
 *.wav
 
 # Softwares
-*.exe
-*.dll
 ffmpeg
+ffmpeg.exe
