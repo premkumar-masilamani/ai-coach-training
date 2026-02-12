@@ -1,10 +1,8 @@
 def format_timestamp(seconds: float) -> str:
-    """Convert seconds to HH:MM:SS,mmm format."""
-    milliseconds = round(seconds * 1000)
-    hours = milliseconds // 3600000
-    milliseconds %= 3600000
-    minutes = milliseconds // 60000
-    milliseconds %= 60000
-    seconds = milliseconds // 1000
-    milliseconds %= 1000
-    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
+    total_seconds = int(seconds)
+
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    secs = total_seconds % 60
+
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
