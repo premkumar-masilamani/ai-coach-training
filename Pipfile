@@ -5,7 +5,6 @@ name = "pypi"
 
 [packages]
 torch = "*"
-faster-whisper = "*"
 "pyannote.audio" = "*"
 huggingface-hub = "*"
 pydub = "*"
@@ -14,6 +13,7 @@ langchain = "*"
 langchain-google-genai = "*"
 langchain-core = "*"
 llm = "*"
+PySide6 = "*"
 
 [dev-packages]
 
