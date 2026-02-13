@@ -28,6 +28,12 @@ def preferred_wav_input(audio_file: Path) -> Path:
     return audio_file
 
 
+def preprocessed_output_path(audio_file: Path) -> Path:
+    if audio_file.suffix.lower() == ".wav" and audio_file.stem.endswith(".whisper"):
+        return audio_file
+    return audio_file.with_suffix("").with_suffix(".whisper.wav")
+
+
 def prepare_audio_for_transcription(
     audio_file: Path, stop_event: Optional[Event] = None
 ) -> Path:
@@ -38,6 +44,15 @@ def prepare_audio_for_transcription(
             audio_file,
             source_audio,
         )
+
+    cached_preprocessed = preprocessed_output_path(source_audio)
+    if cached_preprocessed.exists():
+        logger.info(
+            "Found existing preprocessed audio for %s. Using %s",
+            source_audio,
+            cached_preprocessed,
+        )
+        return cached_preprocessed
 
     if not should_preprocess(source_audio):
         logger.info("Skipping preprocessing for WAV input: %s", source_audio)
@@ -56,7 +71,7 @@ def preprocess_audio(audio_file: Path, stop_event: Optional[Event] = None) -> Pa
 
     ffmpeg_path = get_local_ffmpeg_path()
 
-    output_file = audio_file.with_suffix("").with_suffix(".whisper.wav")
+    output_file = preprocessed_output_path(audio_file)
 
     if output_file.exists():
         logger.info(f"Using cached preprocessed audio: {output_file}")
