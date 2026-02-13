@@ -60,8 +60,13 @@ def _detect_download_url(system: str, arch: str) -> tuple[str, str]:
 
 
 def get_local_ffmpeg_path() -> Path:
-    base_dir = Path(__file__).resolve().parents[2]
-    bin_dir = base_dir / FFMPEG_PATH
+    system_ffmpeg = shutil.which("ffmpeg")
+    if system_ffmpeg:
+        resolved = Path(system_ffmpeg).resolve()
+        logger.info("Using system ffmpeg at %s", resolved)
+        return resolved
+
+    bin_dir = FFMPEG_PATH
     bin_dir.mkdir(parents=True, exist_ok=True)
 
     system = platform.system()

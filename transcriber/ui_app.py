@@ -10,14 +10,15 @@ from transcriber.preprocessing.audio_preprocessor import (
     prepare_audio_for_transcription,
 )
 from transcriber.transcription.transcriber import Transcriber
-from transcriber.utils.constants import AI_MODEL_WHISPER_CPP_DEFAULT_MODEL
 from transcriber.utils.constants import WHISPER_CPP_LOCAL_BIN
 from transcriber.utils.constants import WHISPER_CPP_PATH
 from transcriber.utils.file_util import (
     audio_extensions,
     has_original_pair_for_preprocessed,
     save_transcript_as_text,
+    transcript_path_for_audio,
 )
+from transcriber.utils.model_selection import selected_model_path
 
 logger = logging.getLogger(__name__)
 
@@ -183,9 +184,9 @@ class Worker(QtCore.QThread):
                 self.itemStatus.emit(path, 0, "Canceled")
                 self.itemDone.emit(path)
                 continue
-            transcript_path = path.with_suffix(".txt")
+            transcript_path = transcript_path_for_audio(path)
             if transcript_path.exists():
-                self.itemStatus.emit(path, 100, "Skipped (exists)")
+                self.itemStatus.emit(path, 100, "Skipped (transcript exists)")
                 self.itemDone.emit(path)
                 continue
             try:
@@ -433,7 +434,7 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self._update_overall(0, 0)
         self._add_setup_row("tool.repo", str(WHISPER_CPP_PATH))
         self._add_setup_row("tool.binary", str(WHISPER_CPP_LOCAL_BIN))
-        self._add_setup_row("model.default", str(AI_MODEL_WHISPER_CPP_DEFAULT_MODEL))
+        self._add_setup_row("model.default", str(selected_model_path()))
         logger.info("Preparing first-run tools and model. Controls are disabled until setup completes.")
 
         self.setup_worker = SetupWorker()

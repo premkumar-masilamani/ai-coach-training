@@ -10,12 +10,13 @@ from threading import Event
 from typing import Callable, Optional
 
 from transcriber.utils.constants import DEFAULT_LANGUAGE
-from transcriber.utils.constants import AI_MODEL_WHISPER_CPP_DEFAULT_MODEL
-from transcriber.utils.constants import AI_MODEL_WHISPER_CPP_DEFAULT_MODEL_URL
 from transcriber.utils.constants import WHISPER_CPP_LOCAL_BIN
 from transcriber.utils.constants import WHISPER_CPP_LOCAL_LEGACY_BIN
 from transcriber.utils.constants import WHISPER_CPP_PATH
-from transcriber.utils.constants import WHISPER_CPP_REPO_MODEL
+from transcriber.utils.hardware_profile import cpu_backend_reset_flags
+from transcriber.utils.hardware_profile import detect_hardware_profile
+from transcriber.utils.hardware_profile import select_whisper_backend
+from transcriber.utils.model_selection import select_model_for_hardware
 from transcriber.utils.time_util import format_timestamp
 
 logger = logging.getLogger(__name__)
@@ -89,9 +90,32 @@ def _extract_segments(payload: dict) -> list[dict]:
 
 class Transcriber:
     def __init__(self, progress_cb: Optional[Callable[[str, str, str], None]] = None):
-        self.model_path: Path = AI_MODEL_WHISPER_CPP_DEFAULT_MODEL
         self.repo_path: Path = WHISPER_CPP_PATH
         self.progress_cb = progress_cb
+        self.hardware_profile = detect_hardware_profile()
+        self.backend = select_whisper_backend(self.hardware_profile)
+        self.model_spec = select_model_for_hardware(self.hardware_profile)
+        self.model_path: Path = self.model_spec.local_path
+        self.repo_model_path: Path = self.model_spec.repo_path
+
+        logger.info(
+            "Selected whisper model=%s (min_ram=%sGB) for os=%s arch=%s ram_bucket=%s score=%s",
+            self.model_spec.model_id,
+            self.model_spec.min_ram_gb,
+            self.hardware_profile.system,
+            self.hardware_profile.architecture,
+            self.hardware_profile.ram_bucket,
+            self.hardware_profile.processing_score,
+        )
+
+        if self.hardware_profile.ram_gb < self.model_spec.min_ram_gb:
+            logger.warning(
+                "System RAM (%sGB) is below recommended minimum (%sGB) for model %s.",
+                self.hardware_profile.ram_gb,
+                self.model_spec.min_ram_gb,
+                self.model_spec.model_id,
+            )
+
         if self.repo_path.exists():
             self._report("tool.repo", "Ready", str(self.repo_path))
         else:
@@ -115,16 +139,19 @@ class Transcriber:
             logger.info("Using whisper.cpp binary: %s", self.binary_path)
             self._report("tool.binary", "Ready", self.binary_path)
 
-        if not self.model_path.is_file() and WHISPER_CPP_REPO_MODEL.is_file():
-            self.model_path = WHISPER_CPP_REPO_MODEL
+        if not self.model_path.is_file() and self.repo_model_path.is_file():
+            self.model_path = self.repo_model_path
 
         if not self.model_path.is_file():
             self._report("model.default", "Missing", str(self.model_path))
-            logger.info("whisper.cpp model not found. Downloading default model on first run.")
-            self._download_default_model(self.model_path)
+            logger.info(
+                "whisper.cpp model %s not found. Downloading on first run.",
+                self.model_spec.model_id,
+            )
+            self._download_model(self.model_path, self.model_spec.download_url)
 
-        if not self.model_path.is_file() and WHISPER_CPP_REPO_MODEL.is_file():
-            self.model_path = WHISPER_CPP_REPO_MODEL
+        if not self.model_path.is_file() and self.repo_model_path.is_file():
+            self.model_path = self.repo_model_path
 
         if self.model_path.is_file():
             logger.info("Using whisper.cpp model: %s", self.model_path)
@@ -145,12 +172,12 @@ class Transcriber:
             return str(WHISPER_CPP_LOCAL_BIN)
         if WHISPER_CPP_LOCAL_LEGACY_BIN.is_file():
             return str(WHISPER_CPP_LOCAL_LEGACY_BIN)
-        from_path = shutil.which("whisper-cli")
-        if from_path:
-            return from_path
-        legacy = shutil.which("main")
-        if legacy:
-            return legacy
+
+        for binary_name in ("whisper-cli", "whisper-cli.exe", "main", "main.exe"):
+            from_path = shutil.which(binary_name)
+            if from_path:
+                return from_path
+
         return None
 
     def _run_command(self, command: list[str], cwd: Optional[Path] = None) -> bool:
@@ -172,6 +199,32 @@ class Transcriber:
         except Exception as exc:
             logger.error("Command error: %s (%s)", " ".join(command), exc)
             return False
+
+    def _configure_whisper_cpp_build(self, cmake_bin: str) -> bool:
+        backend_flags = [*cpu_backend_reset_flags(), *self.backend.cmake_flags]
+        logger.info(
+            "Configuring whisper.cpp backend=%s with flags: %s",
+            self.backend.name,
+            " ".join(backend_flags) if backend_flags else "<none>",
+        )
+        configured = self._run_command(
+            [cmake_bin, "-S", ".", "-B", "build", *backend_flags],
+            cwd=self.repo_path,
+        )
+        if configured:
+            return True
+
+        if self.backend.name == "cpu":
+            return False
+
+        logger.warning(
+            "Failed to configure whisper.cpp with backend=%s. Retrying with CPU-only build.",
+            self.backend.name,
+        )
+        return self._run_command(
+            [cmake_bin, "-S", ".", "-B", "build", *cpu_backend_reset_flags()],
+            cwd=self.repo_path,
+        )
 
     def _bootstrap_whisper_cpp(self):
         git_bin = shutil.which("git")
@@ -200,11 +253,8 @@ class Transcriber:
             self._report("tool.repo", "Ready", str(self.repo_path))
 
         self._report("tool.binary", "Building", str(WHISPER_CPP_LOCAL_BIN))
-        logger.info("Building whisper.cpp (Metal backend).")
-        configured = self._run_command(
-            [cmake_bin, "-S", ".", "-B", "build", "-DGGML_METAL=ON"],
-            cwd=self.repo_path,
-        )
+        logger.info("Building whisper.cpp (preferred backend: %s).", self.backend.name)
+        configured = self._configure_whisper_cpp_build(cmake_bin)
         if not configured:
             self._report("tool.binary", "Failed", str(WHISPER_CPP_LOCAL_BIN))
             return
@@ -219,13 +269,13 @@ class Transcriber:
 
         self._report("tool.binary", "Ready", str(WHISPER_CPP_LOCAL_BIN))
 
-    def _download_default_model(self, destination: Path):
+    def _download_model(self, destination: Path, source_url: str):
         destination.parent.mkdir(parents=True, exist_ok=True)
         temp_path = destination.with_suffix(destination.suffix + ".tmp")
         self._report("model.default", "Downloading", str(destination))
-        logger.info("Downloading whisper.cpp model to %s", destination)
+        logger.info("Downloading whisper.cpp model %s to %s", self.model_spec.model_id, destination)
         try:
-            with urllib.request.urlopen(AI_MODEL_WHISPER_CPP_DEFAULT_MODEL_URL, timeout=120) as response:
+            with urllib.request.urlopen(source_url, timeout=120) as response:
                 with open(temp_path, "wb") as out:
                     shutil.copyfileobj(response, out)
             temp_path.replace(destination)
@@ -233,7 +283,12 @@ class Transcriber:
         except Exception as exc:
             if temp_path.exists():
                 temp_path.unlink(missing_ok=True)
-            logger.error("Failed to download whisper.cpp model: %s", exc)
+            logger.error(
+                "Failed to download whisper.cpp model %s from %s: %s",
+                self.model_spec.model_id,
+                source_url,
+                exc,
+            )
             self._report("model.default", "Failed", str(destination))
 
     def transcribe(self, audio_file: Path, stop_event: Optional[Event] = None) -> Optional[str]:

@@ -11,13 +11,39 @@ logger = logging.getLogger()
 
 
 def should_preprocess(audio_file: Path) -> bool:
-    return True
+    if audio_file.suffix.lower() == ".wav":
+        return False
+
+    sibling_wav = audio_file.with_suffix(".wav")
+    return not sibling_wav.exists()
+
+
+def preferred_wav_input(audio_file: Path) -> Path:
+    if audio_file.suffix.lower() == ".wav":
+        return audio_file
+
+    sibling_wav = audio_file.with_suffix(".wav")
+    if sibling_wav.exists():
+        return sibling_wav
+    return audio_file
 
 
 def prepare_audio_for_transcription(
     audio_file: Path, stop_event: Optional[Event] = None
 ) -> Path:
-    return preprocess_audio(audio_file, stop_event=stop_event)
+    source_audio = preferred_wav_input(audio_file)
+    if source_audio != audio_file:
+        logger.info(
+            "Found existing WAV for %s. Skipping preprocessing and using %s",
+            audio_file,
+            source_audio,
+        )
+
+    if not should_preprocess(source_audio):
+        logger.info("Skipping preprocessing for WAV input: %s", source_audio)
+        return source_audio
+
+    return preprocess_audio(source_audio, stop_event=stop_event)
 
 
 def preprocess_audio(audio_file: Path, stop_event: Optional[Event] = None) -> Path:
