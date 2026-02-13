@@ -48,8 +48,8 @@ def has_original_pair_for_preprocessed(file: Path) -> bool:
 def transcript_path_for_audio(file: Path) -> Path:
     if is_preprocessed_whisper_audio(file):
         base_stem = file.stem[: -len(".whisper")]
-        return file.with_name(f"{base_stem}.txt")
-    return file.with_suffix(".txt")
+        return file.with_name(f"{base_stem}.transcript.txt")
+    return file.with_suffix(".transcript.txt")
 
 
 def load_audio_files(folder_path: Path):
