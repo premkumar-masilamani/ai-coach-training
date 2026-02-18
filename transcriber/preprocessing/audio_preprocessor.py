@@ -7,7 +7,8 @@ from typing import Optional
 
 from transcriber.preprocessing.ffmpeg_util import get_local_ffmpeg_path
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
+PREPROCESS_PROGRESS_LOG_INTERVAL_SECONDS = 5.0
 
 
 def should_preprocess(audio_file: Path) -> bool:
@@ -74,10 +75,10 @@ def preprocess_audio(audio_file: Path, stop_event: Optional[Event] = None) -> Pa
     output_file = preprocessed_output_path(audio_file)
 
     if output_file.exists():
-        logger.info(f"Using cached preprocessed audio: {output_file}")
+        logger.info("Using cached preprocessed audio: %s", output_file)
         return output_file
 
-    logger.info(f"Preprocessing {audio_file} -> {output_file}")
+    logger.info("Preprocessing %s -> %s", audio_file, output_file)
 
     command = [
         str(ffmpeg_path),
@@ -93,6 +94,7 @@ def preprocess_audio(audio_file: Path, stop_event: Optional[Event] = None) -> Pa
         "pcm_s16le",
         str(output_file),
     ]
+    logger.debug("ffmpeg command: %s", " ".join(command))
 
     process = subprocess.Popen(
         command,
@@ -100,6 +102,8 @@ def preprocess_audio(audio_file: Path, stop_event: Optional[Event] = None) -> Pa
         stderr=subprocess.PIPE,
         text=True,
     )
+    started_at = time.time()
+    next_progress_log = started_at + PREPROCESS_PROGRESS_LOG_INTERVAL_SECONDS
     while process.poll() is None:
         if stop_event and stop_event.is_set():
             process.terminate()
@@ -109,6 +113,15 @@ def preprocess_audio(audio_file: Path, stop_event: Optional[Event] = None) -> Pa
                 process.kill()
                 process.wait()
             raise InterruptedError(f"Preprocessing canceled for {audio_file}")
+
+        now = time.time()
+        if now >= next_progress_log:
+            logger.info(
+                "Preprocessing in progress: %s (elapsed %.0fs)",
+                audio_file,
+                now - started_at,
+            )
+            next_progress_log = now + PREPROCESS_PROGRESS_LOG_INTERVAL_SECONDS
         time.sleep(0.1)
 
     _, stderr = process.communicate()
@@ -116,4 +129,9 @@ def preprocess_audio(audio_file: Path, stop_event: Optional[Event] = None) -> Pa
         stderr_text = stderr.strip() if stderr else "Unknown error"
         raise RuntimeError(f"ffmpeg failed preprocessing {audio_file}: {stderr_text}")
 
+    logger.info(
+        "Preprocessing completed: %s (elapsed %.2fs)",
+        output_file,
+        time.time() - started_at,
+    )
     return output_file

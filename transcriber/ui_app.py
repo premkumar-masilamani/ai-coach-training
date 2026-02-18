@@ -1,6 +1,9 @@
+import logging
+import os
+import platform
+import shutil
 import sys
 import threading
-import logging
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,15 +13,24 @@ from transcriber.preprocessing.audio_preprocessor import (
     prepare_audio_for_transcription,
 )
 from transcriber.transcription.transcriber import Transcriber
-from transcriber.utils.constants import WHISPER_CPP_LOCAL_BIN
-from transcriber.utils.constants import WHISPER_CPP_PATH
+from transcriber.utils.constants import (
+    FFMPEG_PATH,
+    WHISPER_CPP_LOCAL_BIN,
+    WHISPER_CPP_LOCAL_LEGACY_BIN,
+    WHISPER_CPP_PATH,
+)
 from transcriber.utils.file_util import (
     audio_extensions,
     has_original_pair_for_preprocessed,
     save_transcript_as_text,
     transcript_path_for_audio,
 )
-from transcriber.utils.model_selection import selected_model_path
+from transcriber.utils.hardware_profile import detect_hardware_profile
+from transcriber.utils.model_selection import (
+    min_ram_for_model,
+    select_model_for_hardware,
+    selected_model_path,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -179,22 +191,34 @@ class Worker(QtCore.QThread):
 
     def run(self):
         transcriber = Transcriber()
-        for path in self.items:
+        total = len(self.items)
+        logger.info("Worker started. Items queued: %s", total)
+
+        for index, path in enumerate(self.items, start=1):
+            logger.info("Processing item %s/%s: %s", index, total, path)
             if self._stop_event.is_set():
                 self.itemStatus.emit(path, 0, "Canceled")
                 self.itemDone.emit(path)
+                logger.info("Item canceled before start: %s", path)
                 continue
             transcript_path = transcript_path_for_audio(path)
             if transcript_path.exists():
                 self.itemStatus.emit(path, 100, "Skipped (transcript exists)")
                 self.itemDone.emit(path)
+                logger.info(
+                    "Skipping transcription, transcript exists: %s", transcript_path
+                )
                 continue
             try:
                 self.itemStatus.emit(path, 20, "Preprocessing")
+                logger.info("Preprocessing started: %s", path)
                 processed = prepare_audio_for_transcription(
                     path, stop_event=self._stop_event
                 )
+                logger.info("Preprocessing ready: %s -> %s", path, processed)
+
                 self.itemStatus.emit(path, 65, "Transcribing")
+                logger.info("Transcription started: %s", processed)
                 transcribed_json = transcriber.transcribe(
                     processed, stop_event=self._stop_event
                 )
@@ -204,16 +228,20 @@ class Worker(QtCore.QThread):
                         transcript_path.parent, transcript_path, transcribed_json
                     )
                     self.itemStatus.emit(path, 100, "Done")
+                    logger.info("Transcript saved: %s", transcript_path)
                 else:
                     self.itemStatus.emit(path, 100, "Error")
+                    logger.warning("Transcription produced no output: %s", path)
             except InterruptedError:
                 self.itemStatus.emit(path, 0, "Canceled")
                 logger.info("Canceled: %s", path)
             except Exception as exc:
                 self.itemStatus.emit(path, 100, f"Error: {exc}")
+                logger.exception("Unhandled processing error for %s", path)
             finally:
                 self.itemDone.emit(path)
 
+        logger.info("Worker finished all queued items.")
         self.allDone.emit()
 
 
@@ -243,6 +271,8 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.setWindowTitle("Audio Transcriber")
         self.resize(980, 640)
+        self.hardware_profile = detect_hardware_profile()
+        self.model_spec = select_model_for_hardware(self.hardware_profile)
         self.items: dict[Path, ItemState] = {}
         self.widgets: dict[Path, ItemWidget] = {}
         self.worker: Worker | None = None
@@ -262,6 +292,28 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self._setup_logging()
         self._start_initial_setup()
 
+    def _hardware_profile_text(self) -> str:
+        return (
+            f"OS: {self.hardware_profile.system} | "
+            f"Arch: {self.hardware_profile.architecture} | "
+            f"RAM: {self.hardware_profile.ram_gb}GB | "
+            f"CPU: {self.hardware_profile.cpu_cores} cores | "
+            f"Accelerator: {self.hardware_profile.accelerator} | "
+            f"Score: {self.hardware_profile.processing_score}"
+        )
+
+    def _model_profile_text(self) -> str:
+        min_ram_gb = min_ram_for_model(self.model_spec.model_id)
+        whisper_binary = self._resolve_whisper_binary_for_profile()
+        ffmpeg_binary = self._resolve_ffmpeg_for_profile()
+        return (
+            f"Whisper Model: {self.model_spec.model_id} | "
+            f"Minimum RAM: {min_ram_gb}GB | "
+            f"Path: {self.model_spec.local_path}\n"
+            f"Whisper CLI: {whisper_binary}\n"
+            f"ffmpeg: {ffmpeg_binary}"
+        )
+
     def _build_ui(self):
         central = QtWidgets.QWidget()
         self.setCentralWidget(central)
@@ -269,13 +321,41 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         layout.setContentsMargins(20, 16, 20, 16)
         layout.setSpacing(12)
 
+        header_row = QtWidgets.QHBoxLayout()
+        header_left = QtWidgets.QVBoxLayout()
+        header_left.setSpacing(2)
+
         title = QtWidgets.QLabel("Drop audio files to transcribe")
         title.setObjectName("title")
         subtitle = QtWidgets.QLabel("Transcripts are saved next to each audio file.")
         subtitle.setObjectName("subtitle")
 
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
+        header_left.addWidget(title)
+        header_left.addWidget(subtitle)
+
+        self.system_profile_toggle = QtWidgets.QPushButton("System Profile")
+        self.system_profile_toggle.setObjectName("ghostButton")
+        self.system_profile_toggle.clicked.connect(self._toggle_system_profile)
+        header_left.addWidget(self.system_profile_toggle, 0, QtCore.Qt.AlignLeft)
+
+        header_row.addLayout(header_left, 1)
+        layout.addLayout(header_row)
+
+        self.system_info_card = QtWidgets.QFrame()
+        self.system_info_card.setObjectName("systemInfoCard")
+        info_layout = QtWidgets.QVBoxLayout(self.system_info_card)
+        info_layout.setContentsMargins(12, 10, 12, 10)
+        info_layout.setSpacing(4)
+        self.hardware_label = QtWidgets.QLabel(self._hardware_profile_text())
+        self.hardware_label.setObjectName("systemInfoPrimary")
+        self.model_label = QtWidgets.QLabel(self._model_profile_text())
+        self.model_label.setObjectName("systemInfoSecondary")
+        self.hardware_label.setWordWrap(True)
+        self.model_label.setWordWrap(True)
+        info_layout.addWidget(self.hardware_label)
+        info_layout.addWidget(self.model_label)
+        layout.addWidget(self.system_info_card)
+        self.system_info_card.setVisible(False)
 
         controls = QtWidgets.QHBoxLayout()
         self.add_files_btn = QtWidgets.QPushButton("Add Files")
@@ -291,8 +371,13 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self.stop_btn.clicked.connect(self._stop)
         self.clear_btn.clicked.connect(self._clear)
 
+        self.show_logs_check = QtWidgets.QCheckBox("Show Logs")
+        self.show_logs_check.setChecked(False)
+        self.show_logs_check.toggled.connect(self._toggle_logs_display)
+
         controls.addWidget(self.add_files_btn)
         controls.addWidget(self.add_folder_btn)
+        controls.addWidget(self.show_logs_check)
         controls.addStretch(1)
         controls.addWidget(self.start_btn)
         controls.addWidget(self.stop_btn)
@@ -319,12 +404,13 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self.list_widget.setSpacing(6)
         layout.addWidget(self.list_widget, 1)
 
-        log_label = QtWidgets.QLabel("Logs")
-        layout.addWidget(log_label)
+        self.log_label = QtWidgets.QLabel("Logs")
+        layout.addWidget(self.log_label)
         self.log_view = QtWidgets.QPlainTextEdit()
         self.log_view.setReadOnly(True)
         self.log_view.setMinimumHeight(150)
         layout.addWidget(self.log_view)
+        self._toggle_logs_display(False)
 
         self._apply_style()
 
@@ -348,6 +434,20 @@ class TranscriberWindow(QtWidgets.QMainWindow):
             QLabel#subtitle {
                 color: #555555;
             }
+            QFrame#systemInfoCard {
+                background: #ffffff;
+                border: 1px solid #d9d9d9;
+                border-radius: 10px;
+            }
+            QLabel#systemInfoPrimary {
+                font-size: 13px;
+                font-weight: 600;
+                color: #111111;
+            }
+            QLabel#systemInfoSecondary {
+                font-size: 12px;
+                color: #303030;
+            }
             QPushButton {
                 background: #111111;
                 color: white;
@@ -357,6 +457,12 @@ class TranscriberWindow(QtWidgets.QMainWindow):
             QPushButton:disabled {
                 background: #777777;
                 color: #e0e0e0;
+            }
+            QPushButton#ghostButton {
+                background: #ffffff;
+                color: #111111;
+                border: 1px solid #d0d0d0;
+                padding: 5px 10px;
             }
             QProgressBar {
                 border: 1px solid #d0d0d0;
@@ -397,6 +503,46 @@ class TranscriberWindow(QtWidgets.QMainWindow):
             """
         )
 
+    def _copy_system_profile(self):
+        profile_text = f"{self._hardware_profile_text()}\n{self._model_profile_text()}"
+        QtWidgets.QApplication.clipboard().setText(profile_text)
+        logger.info("System profile copied to clipboard.")
+
+    @QtCore.Slot()
+    def _toggle_system_profile(self):
+        visible = not self.system_info_card.isVisible()
+        self.system_info_card.setVisible(visible)
+        if visible:
+            self._copy_system_profile()
+
+    @QtCore.Slot(bool)
+    def _toggle_logs_display(self, visible: bool):
+        self.log_label.setVisible(visible)
+        self.log_view.setVisible(visible)
+
+    def _resolve_whisper_binary_for_profile(self) -> str:
+        if WHISPER_CPP_LOCAL_BIN.is_file():
+            return str(WHISPER_CPP_LOCAL_BIN)
+        if WHISPER_CPP_LOCAL_LEGACY_BIN.is_file():
+            return str(WHISPER_CPP_LOCAL_LEGACY_BIN)
+        for binary_name in ("whisper-cli", "whisper-cli.exe", "main", "main.exe"):
+            from_path = shutil.which(binary_name)
+            if from_path:
+                return from_path
+        return "Unavailable"
+
+    def _resolve_ffmpeg_for_profile(self) -> str:
+        system_ffmpeg = shutil.which("ffmpeg")
+        if system_ffmpeg:
+            return str(Path(system_ffmpeg).resolve())
+
+        binary_name = "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg"
+        bundled = FFMPEG_PATH / binary_name
+        if bundled.is_file():
+            return str(bundled)
+
+        return "Unavailable"
+
     def _setup_logging(self):
         self._log_emitter = LogEmitter()
         self._log_emitter.message.connect(self._append_log)
@@ -410,7 +556,9 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self._log_handler.setFormatter(formatter)
 
         root = logging.getLogger()
-        root.setLevel(logging.INFO)
+        requested_level = os.environ.get("COACHLENS_LOG_LEVEL", "INFO").upper()
+        resolved_level = getattr(logging, requested_level, logging.INFO)
+        root.setLevel(resolved_level)
         root.addHandler(self._log_handler)
 
         has_stream = any(getattr(h, "_ui_stream_handler", False) for h in root.handlers)
@@ -420,7 +568,9 @@ class TranscriberWindow(QtWidgets.QMainWindow):
             stream_handler.setFormatter(formatter)
             root.addHandler(stream_handler)
 
-        logger.info("UI initialized.")
+        logger.info(
+            "UI initialized. Log level: %s", logging.getLevelName(resolved_level)
+        )
 
     def _start_initial_setup(self):
         self.setup_in_progress = True
@@ -435,7 +585,9 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self._add_setup_row("tool.repo", str(WHISPER_CPP_PATH))
         self._add_setup_row("tool.binary", str(WHISPER_CPP_LOCAL_BIN))
         self._add_setup_row("model.default", str(selected_model_path()))
-        logger.info("Preparing first-run tools and model. Controls are disabled until setup completes.")
+        logger.info(
+            "Preparing first-run tools and model. Controls are disabled until setup completes."
+        )
 
         self.setup_worker = SetupWorker()
         self.setup_worker.statusUpdate.connect(self._on_setup_status)
@@ -492,18 +644,14 @@ class TranscriberWindow(QtWidgets.QMainWindow):
     def _add_files(self):
         if self.setup_in_progress:
             return
-        paths, _ = QtWidgets.QFileDialog.getOpenFileNames(
-            self, "Select audio files"
-        )
+        paths, _ = QtWidgets.QFileDialog.getOpenFileNames(self, "Select audio files")
         if paths:
             self._add_paths([Path(p) for p in paths])
 
     def _add_folder(self):
         if self.setup_in_progress:
             return
-        folder = QtWidgets.QFileDialog.getExistingDirectory(
-            self, "Select folder"
-        )
+        folder = QtWidgets.QFileDialog.getExistingDirectory(self, "Select folder")
         if folder:
             self._add_paths([Path(folder)])
 
@@ -514,7 +662,10 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         for path in paths:
             if path.is_dir():
                 for file_path in path.rglob("*"):
-                    if file_path.is_file() and file_path.suffix.lower() in audio_extensions:
+                    if (
+                        file_path.is_file()
+                        and file_path.suffix.lower() in audio_extensions
+                    ):
                         if has_original_pair_for_preprocessed(file_path):
                             continue
                         added += self._add_item(file_path)
@@ -603,6 +754,7 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         widget = self.widgets.get(path)
         if widget:
             widget.update(progress, status)
+        logger.debug("Item status: %s progress=%s status=%s", path, progress, status)
 
     @QtCore.Slot(Path)
     def _on_item_done(self, path: Path):
@@ -614,7 +766,11 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self._pulse_timer.stop()
         self.overall_progress.setAnimated(False)
         self._set_controls_enabled(True)
-        logger.info("Processing finished. Completed: %s/%s", self.completed_items, self.total_items)
+        logger.info(
+            "Processing finished. Completed: %s/%s",
+            self.completed_items,
+            self.total_items,
+        )
         self._update_overall(self.completed_items, self.total_items)
 
     @QtCore.Slot()
@@ -663,7 +819,9 @@ class TranscriberWindow(QtWidgets.QMainWindow):
                 self._close_requested = True
                 self._set_controls_enabled(False)
                 self.worker.stop()
-                logger.info("Close requested while processing. Waiting for worker to stop.")
+                logger.info(
+                    "Close requested while processing. Waiting for worker to stop."
+                )
             event.ignore()
             return
 
