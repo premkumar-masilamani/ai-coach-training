@@ -7,11 +7,10 @@ from transcriber.preprocessing.audio_preprocessor import (
 from transcriber.transcription.transcriber import Transcriber
 from transcriber.utils.file_util import (
     load_audio_files,
-    save_file,
     save_transcript_as_text,
 )
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class TranscriptionPipeline:
@@ -20,21 +19,25 @@ class TranscriptionPipeline:
         self.transcriber = Transcriber()
 
     def run(self):
+        logger.info("Scanning input directory: %s", self.input_dir)
         pending_files = load_audio_files(self.input_dir)
         if not pending_files:
-            logging.info(f"No audio files to transcribe in {self.input_dir}")
+            logger.info("No audio files to transcribe in %s", self.input_dir)
             return
 
-        for audio_file, transcript_file in pending_files:
+        total = len(pending_files)
+        for index, (audio_file, transcript_file) in enumerate(pending_files, start=1):
+            logger.info("Processing file %s/%s: %s", index, total, audio_file)
             processed_audio_file = prepare_audio_for_transcription(audio_file)
 
             # Transcribe
             transcribed_json = self.transcriber.transcribe(processed_audio_file)
-            # save_file(self.input_dir, transcript_file, transcribed_json)
 
             # Save
             if transcribed_json:
                 save_transcript_as_text(
                     self.input_dir, transcript_file, transcribed_json
                 )
-                logging.info(f"Transcript {transcript_file} saved for {audio_file}")
+                logger.info("Transcript saved: %s", transcript_file)
+            else:
+                logger.warning("Transcription failed for %s", audio_file)

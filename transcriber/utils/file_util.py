@@ -1,9 +1,8 @@
 import json
 import logging
-import os
 from pathlib import Path
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 # --- Supported audio/video extensions ---
 audio_extensions = {
@@ -59,7 +58,7 @@ def load_audio_files(folder_path: Path):
     for file in folder_path.rglob("*"):
         if file.suffix.lower() in audio_extensions and file.is_file():
             if has_original_pair_for_preprocessed(file):
-                logging.info(
+                logger.debug(
                     "Skipping paired preprocessed file: %s (original exists)",
                     file,
                 )
@@ -67,15 +66,16 @@ def load_audio_files(folder_path: Path):
 
             transcript_file = transcript_path_for_audio(file)
             if transcript_file in seen_transcripts:
-                logging.info("Skipping duplicate transcript target for %s", file)
+                logger.debug("Skipping duplicate transcript target for %s", file)
                 continue
 
             if transcript_file.exists():
-                logging.info(f"Skipping. Transcript already exists: {transcript_file}")
+                logger.info("Skipping, transcript already exists: %s", transcript_file)
             else:
                 pending_files.append((file, transcript_file))
                 seen_transcripts.add(transcript_file)
 
+    logger.info("Pending transcription files discovered: %s", len(pending_files))
     return pending_files
 
 

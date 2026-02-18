@@ -17,6 +17,7 @@ class HardwareProfile:
     ram_gb: int
     cpu_cores: int
     accelerator: str
+    has_gpu: bool
     ram_bucket: str
     processing_score: int
 
@@ -158,6 +159,7 @@ def detect_hardware_profile() -> HardwareProfile:
         ram_gb=ram_gb,
         cpu_cores=cpu_cores,
         accelerator=accelerator,
+        has_gpu=accelerator in {"cuda", "metal", "vulkan"},
         ram_bucket=ram_bucket,
         processing_score=score,
     )

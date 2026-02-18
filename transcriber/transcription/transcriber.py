@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import shutil
 import subprocess
 import tempfile
@@ -7,6 +8,7 @@ import time
 import urllib.request
 from pathlib import Path
 from threading import Event
+from threading import Thread
 from typing import Callable, Optional
 
 from transcriber.utils.constants import DEFAULT_LANGUAGE
@@ -16,10 +18,17 @@ from transcriber.utils.constants import WHISPER_CPP_PATH
 from transcriber.utils.hardware_profile import cpu_backend_reset_flags
 from transcriber.utils.hardware_profile import detect_hardware_profile
 from transcriber.utils.hardware_profile import select_whisper_backend
+from transcriber.utils.model_selection import local_model_candidates
+from transcriber.utils.model_selection import min_ram_for_model
+from transcriber.utils.model_selection import repo_model_candidates
 from transcriber.utils.model_selection import select_model_for_hardware
 from transcriber.utils.time_util import format_timestamp
 
 logger = logging.getLogger(__name__)
+TRANSCRIPTION_PROGRESS_LOG_INTERVAL_SECONDS = 10.0
+_WHISPER_SEGMENT_PATTERN = re.compile(
+    r"\[(\d{2}:\d{2}:\d{2}(?:[.,]\d+)?)\s*-->\s*(\d{2}:\d{2}:\d{2}(?:[.,]\d+)?)\]"
+)
 
 
 def _parse_timestamp_to_seconds(raw: str) -> float:
@@ -88,6 +97,19 @@ def _extract_segments(payload: dict) -> list[dict]:
     return lines
 
 
+def _trim_output(text: str, limit: int = 1200) -> str:
+    if len(text) <= limit:
+        return text
+    return f"{text[:limit]} ... [truncated]"
+
+
+def _extract_segment_end_seconds(line: str) -> Optional[float]:
+    match = _WHISPER_SEGMENT_PATTERN.search(line)
+    if not match:
+        return None
+    return _parse_timestamp_to_seconds(match.group(2))
+
+
 class Transcriber:
     def __init__(self, progress_cb: Optional[Callable[[str, str, str], None]] = None):
         self.repo_path: Path = WHISPER_CPP_PATH
@@ -95,24 +117,25 @@ class Transcriber:
         self.hardware_profile = detect_hardware_profile()
         self.backend = select_whisper_backend(self.hardware_profile)
         self.model_spec = select_model_for_hardware(self.hardware_profile)
+        self.model_min_ram_gb = min_ram_for_model(self.model_spec.model_id)
         self.model_path: Path = self.model_spec.local_path
-        self.repo_model_path: Path = self.model_spec.repo_path
 
         logger.info(
-            "Selected whisper model=%s (min_ram=%sGB) for os=%s arch=%s ram_bucket=%s score=%s",
+            "Selected whisper model=%s format=%s (min_ram=%sGB) for os=%s arch=%s ram_bucket=%s score=%s",
             self.model_spec.model_id,
-            self.model_spec.min_ram_gb,
+            self.model_spec.format,
+            self.model_min_ram_gb,
             self.hardware_profile.system,
             self.hardware_profile.architecture,
             self.hardware_profile.ram_bucket,
             self.hardware_profile.processing_score,
         )
 
-        if self.hardware_profile.ram_gb < self.model_spec.min_ram_gb:
+        if self.hardware_profile.ram_gb < self.model_min_ram_gb:
             logger.warning(
                 "System RAM (%sGB) is below recommended minimum (%sGB) for model %s.",
                 self.hardware_profile.ram_gb,
-                self.model_spec.min_ram_gb,
+                self.model_min_ram_gb,
                 self.model_spec.model_id,
             )
 
@@ -139,19 +162,35 @@ class Transcriber:
             logger.info("Using whisper.cpp binary: %s", self.binary_path)
             self._report("tool.binary", "Ready", self.binary_path)
 
-        if not self.model_path.is_file() and self.repo_model_path.is_file():
-            self.model_path = self.repo_model_path
+        if not self.model_path.is_file():
+            for repo_candidate in repo_model_candidates(self.model_spec):
+                if repo_candidate.is_file():
+                    self.model_path = repo_candidate
+                    break
 
         if not self.model_path.is_file():
             self._report("model.default", "Missing", str(self.model_path))
             logger.info(
-                "whisper.cpp model %s not found. Downloading on first run.",
+                "whisper.cpp model %s not found. Downloading on first run (preferred format=%s).",
                 self.model_spec.model_id,
+                self.model_spec.format,
             )
-            self._download_model(self.model_path, self.model_spec.download_url)
+            self._download_model(
+                destination=self.model_path,
+                source_url=self.model_spec.download_url,
+                model_id=self.model_spec.model_id,
+            )
 
-        if not self.model_path.is_file() and self.repo_model_path.is_file():
-            self.model_path = self.repo_model_path
+        if not self.model_path.is_file():
+            for local_candidate in local_model_candidates(self.model_spec):
+                if local_candidate.is_file():
+                    self.model_path = local_candidate
+                    break
+        if not self.model_path.is_file():
+            for repo_candidate in repo_model_candidates(self.model_spec):
+                if repo_candidate.is_file():
+                    self.model_path = repo_candidate
+                    break
 
         if self.model_path.is_file():
             logger.info("Using whisper.cpp model: %s", self.model_path)
@@ -269,27 +308,28 @@ class Transcriber:
 
         self._report("tool.binary", "Ready", str(WHISPER_CPP_LOCAL_BIN))
 
-    def _download_model(self, destination: Path, source_url: str):
+    def _download_model(
+        self,
+        destination: Path,
+        source_url: str,
+        model_id: str,
+    ) -> bool:
         destination.parent.mkdir(parents=True, exist_ok=True)
         temp_path = destination.with_suffix(destination.suffix + ".tmp")
         self._report("model.default", "Downloading", str(destination))
-        logger.info("Downloading whisper.cpp model %s to %s", self.model_spec.model_id, destination)
+        logger.info("Downloading whisper.cpp model %s to %s", model_id, destination)
         try:
             with urllib.request.urlopen(source_url, timeout=120) as response:
                 with open(temp_path, "wb") as out:
                     shutil.copyfileobj(response, out)
             temp_path.replace(destination)
             self._report("model.default", "Ready", str(destination))
+            return True
         except Exception as exc:
             if temp_path.exists():
                 temp_path.unlink(missing_ok=True)
-            logger.error(
-                "Failed to download whisper.cpp model %s from %s: %s",
-                self.model_spec.model_id,
-                source_url,
-                exc,
-            )
-            self._report("model.default", "Failed", str(destination))
+            logger.error("Failed to download whisper.cpp model %s from %s: %s", model_id, source_url, exc)
+            return False
 
     def transcribe(self, audio_file: Path, stop_event: Optional[Event] = None) -> Optional[str]:
         if stop_event and stop_event.is_set():
@@ -319,13 +359,39 @@ class Transcriber:
                 "-of",
                 str(output_base),
             ]
+            logger.debug("whisper.cpp command: %s", " ".join(command))
 
             process = subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                bufsize=1,
             )
+
+            stdout_lines: list[str] = []
+            stderr_lines: list[str] = []
+            progress_state = {"seconds": 0.0}
+
+            def _drain_stream(stream, sink: list[str], stream_name: str):
+                for line in iter(stream.readline, ""):
+                    text = line.rstrip()
+                    sink.append(text)
+                    segment_end = _extract_segment_end_seconds(text)
+                    if segment_end is not None:
+                        progress_state["seconds"] = max(progress_state["seconds"], segment_end)
+                    logger.debug("whisper.cpp %s: %s", stream_name, text)
+                stream.close()
+
+            stdout_thread = Thread(
+                target=_drain_stream, args=(process.stdout, stdout_lines, "stdout"), daemon=True
+            )
+            stderr_thread = Thread(
+                target=_drain_stream, args=(process.stderr, stderr_lines, "stderr"), daemon=True
+            )
+            stdout_thread.start()
+            stderr_thread.start()
+            next_progress_log = start_transcribe + TRANSCRIPTION_PROGRESS_LOG_INTERVAL_SECONDS
 
             while process.poll() is None:
                 if stop_event and stop_event.is_set():
@@ -336,9 +402,33 @@ class Transcriber:
                         process.kill()
                         process.wait()
                     raise InterruptedError(f"Transcription canceled for {audio_file}")
+
+                now = time.time()
+                if now >= next_progress_log:
+                    transcribed_seconds = progress_state["seconds"]
+                    if transcribed_seconds > 0:
+                        logger.info(
+                            "Transcription in progress: %s (transcribed %.2fs)",
+                            audio_file,
+                            transcribed_seconds,
+                        )
+                    else:
+                        logger.info(
+                            "Transcription in progress: %s (waiting for model timestamp output)",
+                            audio_file,
+                        )
+                    next_progress_log = now + TRANSCRIPTION_PROGRESS_LOG_INTERVAL_SECONDS
                 time.sleep(0.1)
 
-            stdout, stderr = process.communicate()
+            stdout_thread.join(timeout=2)
+            stderr_thread.join(timeout=2)
+            stdout = "\n".join(stdout_lines).strip()
+            stderr = "\n".join(stderr_lines).strip()
+            if stdout:
+                logger.debug("whisper.cpp stdout summary: %s", _trim_output(stdout))
+            if stderr:
+                logger.debug("whisper.cpp stderr summary: %s", _trim_output(stderr))
+
             if process.returncode != 0:
                 details = (stderr or stdout or "Unknown error").strip()
                 logger.error("whisper.cpp failed for %s: %s", audio_file, details)
