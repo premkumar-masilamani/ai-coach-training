@@ -333,29 +333,8 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         header_left.addWidget(title)
         header_left.addWidget(subtitle)
 
-        self.system_profile_toggle = QtWidgets.QPushButton("System Profile")
-        self.system_profile_toggle.setObjectName("ghostButton")
-        self.system_profile_toggle.clicked.connect(self._toggle_system_profile)
-        header_left.addWidget(self.system_profile_toggle, 0, QtCore.Qt.AlignLeft)
-
         header_row.addLayout(header_left, 1)
         layout.addLayout(header_row)
-
-        self.system_info_card = QtWidgets.QFrame()
-        self.system_info_card.setObjectName("systemInfoCard")
-        info_layout = QtWidgets.QVBoxLayout(self.system_info_card)
-        info_layout.setContentsMargins(12, 10, 12, 10)
-        info_layout.setSpacing(4)
-        self.hardware_label = QtWidgets.QLabel(self._hardware_profile_text())
-        self.hardware_label.setObjectName("systemInfoPrimary")
-        self.model_label = QtWidgets.QLabel(self._model_profile_text())
-        self.model_label.setObjectName("systemInfoSecondary")
-        self.hardware_label.setWordWrap(True)
-        self.model_label.setWordWrap(True)
-        info_layout.addWidget(self.hardware_label)
-        info_layout.addWidget(self.model_label)
-        layout.addWidget(self.system_info_card)
-        self.system_info_card.setVisible(False)
 
         controls = QtWidgets.QHBoxLayout()
         self.add_files_btn = QtWidgets.QPushButton("Add Files")
@@ -371,12 +350,17 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self.stop_btn.clicked.connect(self._stop)
         self.clear_btn.clicked.connect(self._clear)
 
+        self.show_profile_check = QtWidgets.QCheckBox("System Profile")
+        self.show_profile_check.setChecked(True)
+        self.show_profile_check.toggled.connect(self._toggle_system_profile_display)
+
         self.show_logs_check = QtWidgets.QCheckBox("Show Logs")
-        self.show_logs_check.setChecked(False)
+        self.show_logs_check.setChecked(True)
         self.show_logs_check.toggled.connect(self._toggle_logs_display)
 
         controls.addWidget(self.add_files_btn)
         controls.addWidget(self.add_folder_btn)
+        controls.addWidget(self.show_profile_check)
         controls.addWidget(self.show_logs_check)
         controls.addStretch(1)
         controls.addWidget(self.start_btn)
@@ -404,13 +388,29 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self.list_widget.setSpacing(6)
         layout.addWidget(self.list_widget, 1)
 
+        self.system_info_card = QtWidgets.QFrame()
+        self.system_info_card.setObjectName("systemInfoCard")
+        info_layout = QtWidgets.QVBoxLayout(self.system_info_card)
+        info_layout.setContentsMargins(12, 10, 12, 10)
+        info_layout.setSpacing(4)
+        self.hardware_label = QtWidgets.QLabel(self._hardware_profile_text())
+        self.hardware_label.setObjectName("systemInfoPrimary")
+        self.model_label = QtWidgets.QLabel(self._model_profile_text())
+        self.model_label.setObjectName("systemInfoSecondary")
+        self.hardware_label.setWordWrap(True)
+        self.model_label.setWordWrap(True)
+        info_layout.addWidget(self.hardware_label)
+        info_layout.addWidget(self.model_label)
+        layout.addWidget(self.system_info_card)
+
         self.log_label = QtWidgets.QLabel("Logs")
         layout.addWidget(self.log_label)
         self.log_view = QtWidgets.QPlainTextEdit()
         self.log_view.setReadOnly(True)
         self.log_view.setMinimumHeight(150)
         layout.addWidget(self.log_view)
-        self._toggle_logs_display(False)
+        self._toggle_system_profile_display(True)
+        self._toggle_logs_display(True)
 
         self._apply_style()
 
@@ -508,12 +508,9 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         QtWidgets.QApplication.clipboard().setText(profile_text)
         logger.info("System profile copied to clipboard.")
 
-    @QtCore.Slot()
-    def _toggle_system_profile(self):
-        visible = not self.system_info_card.isVisible()
+    @QtCore.Slot(bool)
+    def _toggle_system_profile_display(self, visible: bool):
         self.system_info_card.setVisible(visible)
-        if visible:
-            self._copy_system_profile()
 
     @QtCore.Slot(bool)
     def _toggle_logs_display(self, visible: bool):
