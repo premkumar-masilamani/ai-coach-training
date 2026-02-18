@@ -1,6 +1,5 @@
 import json
 import logging
-import re
 import shutil
 import subprocess
 import tempfile
@@ -25,10 +24,6 @@ from transcriber.utils.model_selection import select_model_for_hardware
 from transcriber.utils.time_util import format_timestamp
 
 logger = logging.getLogger(__name__)
-TRANSCRIPTION_PROGRESS_LOG_INTERVAL_SECONDS = 10.0
-_WHISPER_SEGMENT_PATTERN = re.compile(
-    r"\[(\d{2}:\d{2}:\d{2}(?:[.,]\d+)?)\s*-->\s*(\d{2}:\d{2}:\d{2}(?:[.,]\d+)?)\]"
-)
 
 
 def _parse_timestamp_to_seconds(raw: str) -> float:
@@ -95,19 +90,6 @@ def _extract_segments(payload: dict) -> list[dict]:
         )
 
     return lines
-
-
-def _trim_output(text: str, limit: int = 1200) -> str:
-    if len(text) <= limit:
-        return text
-    return f"{text[:limit]} ... [truncated]"
-
-
-def _extract_segment_end_seconds(line: str) -> Optional[float]:
-    match = _WHISPER_SEGMENT_PATTERN.search(line)
-    if not match:
-        return None
-    return _parse_timestamp_to_seconds(match.group(2))
 
 
 class Transcriber:
@@ -371,16 +353,13 @@ class Transcriber:
 
             stdout_lines: list[str] = []
             stderr_lines: list[str] = []
-            progress_state = {"seconds": 0.0}
 
             def _drain_stream(stream, sink: list[str], stream_name: str):
                 for line in iter(stream.readline, ""):
                     text = line.rstrip()
                     sink.append(text)
-                    segment_end = _extract_segment_end_seconds(text)
-                    if segment_end is not None:
-                        progress_state["seconds"] = max(progress_state["seconds"], segment_end)
-                    logger.debug("whisper.cpp %s: %s", stream_name, text)
+                    if text:
+                        logger.info("whisper.cpp %s: %s", stream_name, text)
                 stream.close()
 
             stdout_thread = Thread(
@@ -391,7 +370,6 @@ class Transcriber:
             )
             stdout_thread.start()
             stderr_thread.start()
-            next_progress_log = start_transcribe + TRANSCRIPTION_PROGRESS_LOG_INTERVAL_SECONDS
 
             while process.poll() is None:
                 if stop_event and stop_event.is_set():
@@ -402,32 +380,12 @@ class Transcriber:
                         process.kill()
                         process.wait()
                     raise InterruptedError(f"Transcription canceled for {audio_file}")
-
-                now = time.time()
-                if now >= next_progress_log:
-                    transcribed_seconds = progress_state["seconds"]
-                    if transcribed_seconds > 0:
-                        logger.info(
-                            "Transcription in progress: %s (transcribed %.2fs)",
-                            audio_file,
-                            transcribed_seconds,
-                        )
-                    else:
-                        logger.info(
-                            "Transcription in progress: %s (waiting for model timestamp output)",
-                            audio_file,
-                        )
-                    next_progress_log = now + TRANSCRIPTION_PROGRESS_LOG_INTERVAL_SECONDS
                 time.sleep(0.1)
 
             stdout_thread.join(timeout=2)
             stderr_thread.join(timeout=2)
             stdout = "\n".join(stdout_lines).strip()
             stderr = "\n".join(stderr_lines).strip()
-            if stdout:
-                logger.debug("whisper.cpp stdout summary: %s", _trim_output(stdout))
-            if stderr:
-                logger.debug("whisper.cpp stderr summary: %s", _trim_output(stderr))
 
             if process.returncode != 0:
                 details = (stderr or stdout or "Unknown error").strip()
