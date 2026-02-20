@@ -111,44 +111,6 @@ class ItemState:
     progress: int = 0
     status: str = "Queued"
 
-
-class ItemWidget(QtWidgets.QWidget):
-    def __init__(self, state: ItemState, parent=None):
-        super().__init__(parent)
-        self.state = state
-        self._active = False
-        layout = QtWidgets.QHBoxLayout(self)
-        layout.setContentsMargins(8, 4, 8, 4)
-
-        self.label = QtWidgets.QLabel(str(state.path))
-        self.label.setSizePolicy(
-            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred
-        )
-        self.progress = AnimatedProgressBar()
-        self.progress.setRange(0, 100)
-        self.progress.setValue(state.progress)
-        self.progress.setFixedWidth(180)
-        self.status = QtWidgets.QLabel(state.status)
-        self.status.setFixedWidth(140)
-
-        layout.addWidget(self.label, 1)
-        layout.addWidget(self.progress, 0)
-        layout.addWidget(self.status, 0)
-
-    def update(self, progress: int, status: str):
-        self.progress.setValue(progress)
-        self.status.setText(status)
-
-        active_states = {"Preprocessing", "Transcribing", "Saving"}
-        self._active = status in active_states and progress < 100
-        self.progress.setAnimated(self._active)
-
-    def animate(self):
-        if not self._active:
-            return
-        self.progress.advancePattern()
-
-
 class DropArea(QtWidgets.QFrame):
     pathsDropped = QtCore.Signal(list)
 
@@ -202,14 +164,14 @@ class Worker(QtCore.QThread):
                 logger.info("Item canceled before start: %s", path)
                 continue
             transcript_path = transcript_path_for_audio(path)
-            if transcript_path.exists():
-                self.itemStatus.emit(path, 100, "Skipped (transcript exists)")
-                self.itemDone.emit(path)
-                logger.info(
-                    "Skipping transcription, transcript exists: %s", transcript_path
-                )
-                continue
             try:
+                if transcript_path.exists():
+                    self.itemStatus.emit(path, 100, "Skipped (transcript exists)")
+                    logger.info(
+                        "Skipping transcription, transcript exists: %s", transcript_path
+                    )
+                    continue
+
                 self.itemStatus.emit(path, 20, "Preprocessing")
                 logger.info("Preprocessing started: %s", path)
                 processed = prepare_audio_for_transcription(
@@ -227,8 +189,8 @@ class Worker(QtCore.QThread):
                     save_transcript_as_text(
                         transcript_path.parent, transcript_path, transcribed_json
                     )
-                    self.itemStatus.emit(path, 100, "Done")
                     logger.info("Transcript saved: %s", transcript_path)
+                    self.itemStatus.emit(path, 100, "Done")
                 else:
                     self.itemStatus.emit(path, 100, "Error")
                     logger.warning("Transcription produced no output: %s", path)
@@ -267,6 +229,9 @@ class SetupWorker(QtCore.QThread):
 
 
 class TranscriberWindow(QtWidgets.QMainWindow):
+    ITEMS_HEADERS = ("Audio File", "Status", "Transcript File")
+    SETUP_HEADERS = ("Component", "Status", "Location")
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Audio Transcriber")
@@ -274,7 +239,7 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self.hardware_profile = detect_hardware_profile()
         self.model_spec = select_model_for_hardware(self.hardware_profile)
         self.items: dict[Path, ItemState] = {}
-        self.widgets: dict[Path, ItemWidget] = {}
+        self.rows: dict[Path, QtWidgets.QTreeWidgetItem] = {}
         self.worker: Worker | None = None
         self.total_items = 0
         self.completed_items = 0
@@ -283,7 +248,7 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self._close_requested = False
         self.setup_worker: SetupWorker | None = None
         self.setup_in_progress = True
-        self._setup_rows: dict[str, QtWidgets.QListWidgetItem] = {}
+        self._setup_rows: dict[str, QtWidgets.QTreeWidgetItem] = {}
         self._pulse_timer = QtCore.QTimer(self)
         self._pulse_timer.setInterval(120)
         self._pulse_timer.timeout.connect(self._animate_progress)
@@ -384,8 +349,14 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self.list_label = QtWidgets.QLabel("Items")
         layout.addWidget(self.list_label)
 
-        self.list_widget = QtWidgets.QListWidget()
-        self.list_widget.setSpacing(6)
+        self.list_widget = QtWidgets.QTreeWidget()
+        self.list_widget.setColumnCount(3)
+        self.list_widget.setHeaderLabels(list(self.ITEMS_HEADERS))
+        self.list_widget.setRootIsDecorated(False)
+        self.list_widget.setUniformRowHeights(True)
+        self.list_widget.setAlternatingRowColors(True)
+        self.list_widget.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.list_widget.itemClicked.connect(self._on_list_item_clicked)
         layout.addWidget(self.list_widget, 1)
 
         self.system_info_card = QtWidgets.QFrame()
@@ -485,11 +456,19 @@ class TranscriberWindow(QtWidgets.QMainWindow):
                 border: 1px dashed #c7c7c7;
                 border-radius: 10px;
             }
-            QListWidget {
+            QTreeWidget {
                 background: #ffffff;
                 border: 1px solid #e0e0e0;
                 border-radius: 10px;
                 color: #161616;
+            }
+            QHeaderView::section {
+                background: #f0f0f0;
+                padding: 6px;
+                border: none;
+                border-bottom: 1px solid #dddddd;
+                font-weight: 600;
+                color: #111111;
             }
             QPlainTextEdit {
                 background: #0f1216;
@@ -574,10 +553,11 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self._set_controls_enabled(False)
         self.drop_area.setEnabled(False)
         self.list_label.setText("Initial setup downloads")
+        self.list_widget.setHeaderLabels(list(self.SETUP_HEADERS))
         self._setup_rows.clear()
         self.list_widget.clear()
         self.items.clear()
-        self.widgets.clear()
+        self.rows.clear()
         self._update_overall(0, 0)
         self._add_setup_row("tool.repo", str(WHISPER_CPP_PATH))
         self._add_setup_row("tool.binary", str(WHISPER_CPP_LOCAL_BIN))
@@ -593,15 +573,16 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self.setup_worker.start()
 
     def _add_setup_row(self, item_id: str, path_text: str):
-        item = QtWidgets.QListWidgetItem(f"Queued       {path_text}")
-        self.list_widget.addItem(item)
+        item = QtWidgets.QTreeWidgetItem([item_id, "Queued", path_text])
+        self.list_widget.addTopLevelItem(item)
         self._setup_rows[item_id] = item
 
     @QtCore.Slot(str, str, str)
     def _on_setup_status(self, item_id: str, status: str, path_text: str):
         row = self._setup_rows.get(item_id)
         if row:
-            row.setText(f"{status:<12} {path_text}")
+            row.setText(1, status)
+            row.setText(2, path_text)
 
     @QtCore.Slot(bool, str)
     def _on_setup_done(self, success: bool, message: str):
@@ -610,6 +591,7 @@ class TranscriberWindow(QtWidgets.QMainWindow):
             self.list_widget.clear()
             self._setup_rows.clear()
             self.list_label.setText("Items")
+            self.list_widget.setHeaderLabels(list(self.ITEMS_HEADERS))
             self.drop_area.setEnabled(True)
             self._set_controls_enabled(True)
             logger.info("First-run setup complete. You can now add files.")
@@ -680,14 +662,16 @@ class TranscriberWindow(QtWidgets.QMainWindow):
     def _add_item(self, path: Path) -> int:
         if path in self.items:
             return 0
-        state = ItemState(path=path)
-        widget = ItemWidget(state)
-        list_item = QtWidgets.QListWidgetItem(self.list_widget)
-        list_item.setSizeHint(widget.sizeHint())
-        self.list_widget.addItem(list_item)
-        self.list_widget.setItemWidget(list_item, widget)
+        state = ItemState(path=path, progress=0, status="Queued")
+        transcript_path = transcript_path_for_audio(path)
+        row = QtWidgets.QTreeWidgetItem(
+            [str(path), state.status, str(transcript_path)]
+        )
+        self.list_widget.addTopLevelItem(row)
+        self._style_clickable_cell(row, 0)
+        self._style_clickable_cell(row, 2)
         self.items[path] = state
-        self.widgets[path] = widget
+        self.rows[path] = row
         return 1
 
     def _clear(self):
@@ -696,7 +680,7 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         if self.worker and self.worker.isRunning():
             return
         self.items.clear()
-        self.widgets.clear()
+        self.rows.clear()
         self.list_widget.clear()
         self._update_overall(0, 0)
 
@@ -748,9 +732,13 @@ class TranscriberWindow(QtWidgets.QMainWindow):
 
     @QtCore.Slot(Path, int, str)
     def _on_item_status(self, path: Path, progress: int, status: str):
-        widget = self.widgets.get(path)
-        if widget:
-            widget.update(progress, status)
+        state = self.items.get(path)
+        if state:
+            state.progress = progress
+            state.status = status
+        row = self.rows.get(path)
+        if row:
+            row.setText(1, f"{status} ({progress}%)")
         logger.debug("Item status: %s progress=%s status=%s", path, progress, status)
 
     @QtCore.Slot(Path)
@@ -787,9 +775,31 @@ class TranscriberWindow(QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def _animate_progress(self):
-        for widget in self.widgets.values():
-            widget.animate()
         self.overall_progress.advancePattern()
+
+    @QtCore.Slot(QtWidgets.QTreeWidgetItem, int)
+    def _on_list_item_clicked(self, item: QtWidgets.QTreeWidgetItem, column: int):
+        if self.setup_in_progress:
+            return
+        if column not in {0, 2}:
+            return
+        raw = item.text(column).strip()
+        if not raw:
+            return
+        self._open_in_default_app(Path(raw))
+
+    def _open_in_default_app(self, path: Path):
+        if not path.exists():
+            logger.warning("Path does not exist: %s", path)
+            return
+        url = QtCore.QUrl.fromLocalFile(str(path))
+        QtGui.QDesktopServices.openUrl(url)
+
+    def _style_clickable_cell(self, item: QtWidgets.QTreeWidgetItem, column: int):
+        item.setForeground(column, QtGui.QBrush(QtGui.QColor("#0a58ca")))
+        font = item.font(column)
+        font.setUnderline(True)
+        item.setFont(column, font)
 
     def closeEvent(self, event):
         if self.setup_worker and self.setup_worker.isRunning():

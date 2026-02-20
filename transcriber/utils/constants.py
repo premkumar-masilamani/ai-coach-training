@@ -2,6 +2,7 @@ import os
 import platform
 from pathlib import Path
 
+
 def _resolve_coachlens_home() -> Path:
     system = platform.system()
     home = Path.home()
