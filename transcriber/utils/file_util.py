@@ -130,13 +130,15 @@ def load_audio_files(folder_path: Path):
 
 # TODO: Remove after the pipeline is completed
 def save_transcript_as_text(folder_path: Path, filename: str, file_content: str):
-    """
-    transcribed_json: JSON string like
-      '{"transcription": [{"start": 0.0, "end": 8.08, "text": "..."}]}'
-    """
+    del folder_path
     data = json.loads(file_content)
-    segments = data.get("transcription", [])
+    raw_transcript = str(data.get("raw_transcript", "")).strip()
+    if raw_transcript:
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(raw_transcript)
+        return
 
+    segments = data.get("transcription", [])
     lines = []
     for s in segments:
         start_val = s.get("start")
