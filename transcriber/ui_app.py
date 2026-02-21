@@ -5,10 +5,8 @@ import platform
 import shutil
 import sys
 import threading
-import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from xml.sax.saxutils import escape
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
@@ -20,7 +18,6 @@ from transcriber.utils.constants import (
     FFMPEG_PATH,
     WHISPER_CPP_LOCAL_BIN,
     WHISPER_CPP_LOCAL_LEGACY_BIN,
-    WHISPER_CPP_PATH,
 )
 from transcriber.utils.file_util import (
     is_preprocessed_whisper_audio,
@@ -209,126 +206,27 @@ class Worker(QtCore.QThread):
         self,
         items: list[Path],
         language: str,
-        output_format: str,
         include_timestamps: bool,
         parent=None,
     ):
         super().__init__(parent)
         self.items = items
         self.language = language
-        self.output_format = output_format
         self.include_timestamps = include_timestamps
         self._stop_event = threading.Event()
 
     def stop(self):
         self._stop_event.set()
 
-    def _extract_segments(self, transcribed_json: str) -> list[dict]:
-        payload = json.loads(transcribed_json)
-        segments = payload.get("transcription", [])
-        return [segment for segment in segments if str(segment.get("text", "")).strip()]
-
-    def _build_plain_text(self, segments: list[dict]) -> str:
-        lines: list[str] = []
-        for segment in segments:
-            text = str(segment.get("text", "")).strip()
-            if not text:
-                continue
-            if self.include_timestamps:
-                start = float(segment.get("start", 0.0))
-                end = float(segment.get("end", 0.0))
-                lines.append(f"{start:.2f} - {end:.2f} | {text}")
-            else:
-                lines.append(text)
-        return "\n".join(lines).strip()
-
     def _save_txt(self, transcript_path: Path, text_content: str):
         with open(transcript_path, "w", encoding="utf-8") as handle:
             handle.write(text_content)
 
-    def _save_srt(self, transcript_path: Path, segments: list[dict]):
-        srt_path = transcript_path.with_suffix(".srt")
-
-        lines: list[str] = []
-        for index, segment in enumerate(segments, start=1):
-            start = float(segment.get("start", 0.0))
-            end = float(segment.get("end", 0.0))
-            text = str(segment.get("text", "")).strip()
-            if not text:
-                continue
-            lines.append(str(index))
-            lines.append(f"{self._to_srt_time(start)} --> {self._to_srt_time(end)}")
-            lines.append(text)
-            lines.append("")
-
-        with open(srt_path, "w", encoding="utf-8") as handle:
-            handle.write("\n".join(lines))
-
-    @staticmethod
-    def _to_srt_time(value: float) -> str:
-        total_ms = max(0, int(value * 1000))
-        hours = total_ms // 3600000
-        minutes = (total_ms % 3600000) // 60000
-        seconds = (total_ms % 60000) // 1000
-        millis = total_ms % 1000
-        return f"{hours:02}:{minutes:02}:{seconds:02},{millis:03}"
-
-    def _save_pdf(self, transcript_path: Path, text_content: str):
-        pdf_path = transcript_path.with_suffix(".pdf")
-        writer = QtGui.QPdfWriter(str(pdf_path))
-        writer.setPageSize(QtGui.QPageSize(QtGui.QPageSize.A4))
-        writer.setResolution(96)
-        doc = QtGui.QTextDocument()
-        doc.setDefaultFont(QtGui.QFont("Helvetica", 11))
-        doc.setPlainText(text_content)
-        doc.print_(writer)
-
-    def _save_docx(self, transcript_path: Path, text_content: str):
-        docx_path = transcript_path.with_suffix(".docx")
-        content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-<Default Extension="xml" ContentType="application/xml"/>
-<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-</Types>"""
-        rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>"""
-        document_rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"""
-        paragraphs = []
-        for line in text_content.splitlines():
-            paragraphs.append(
-                f'<w:p><w:r><w:t xml:space="preserve">{escape(line)}</w:t></w:r></w:p>'
-            )
-        if not paragraphs:
-            paragraphs = ["<w:p/>"]
-        document_xml = (
-            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-<w:body>"""
-            + "".join(paragraphs)
-            + """<w:sectPr/></w:body></w:document>"""
-        )
-        with zipfile.ZipFile(docx_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr("[Content_Types].xml", content_types)
-            zf.writestr("_rels/.rels", rels)
-            zf.writestr("word/document.xml", document_xml)
-            zf.writestr("word/_rels/document.xml.rels", document_rels)
-
-    def _save_selected_output(self, transcript_path: Path, transcribed_json: str):
-        segments = self._extract_segments(transcribed_json)
-        text_content = self._build_plain_text(segments)
+    def _save_transcript_output(self, transcript_path: Path, transcribed_json: str):
+        payload = json.loads(transcribed_json)
+        raw_transcript = str(payload.get("raw_transcript", "")).strip()
+        text_content = raw_transcript
         self._save_txt(transcript_path, text_content)
-
-        selected = self.output_format.upper().strip()
-        if selected == "SRT":
-            self._save_srt(transcript_path, segments)
-        elif selected == "PDF":
-            self._save_pdf(transcript_path, text_content)
-        elif selected == "DOCX":
-            self._save_docx(transcript_path, text_content)
 
     def run(self):
         transcriber = Transcriber()
@@ -368,7 +266,7 @@ class Worker(QtCore.QThread):
                 )
                 if transcribed_json:
                     self.itemStatus.emit(path, 90, "Saving", index, total)
-                    self._save_selected_output(transcript_path, transcribed_json)
+                    self._save_transcript_output(transcript_path, transcribed_json)
                     logger.info("Transcript saved: %s", transcript_path)
                     self.itemStatus.emit(path, 100, "Done", index, total)
                 else:
@@ -445,25 +343,6 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self._build_ui()
         self._setup_logging()
         self._start_initial_setup()
-
-    def _hardware_profile_text(self) -> str:
-        return (
-            f"OS: {self.hardware_profile.system} | "
-            f"Arch: {self.hardware_profile.architecture} | "
-            f"RAM: {self.hardware_profile.ram_gb}GB | "
-            f"CPU: {self.hardware_profile.cpu_cores} cores | "
-            f"Accelerator: {self.hardware_profile.accelerator}"
-        )
-
-    def _model_profile_text(self) -> str:
-        min_ram_gb = min_ram_for_model(self.model_spec.model_id)
-        whisper_binary = self._resolve_whisper_binary_for_profile()
-        ffmpeg_binary = self._resolve_ffmpeg_for_profile()
-        return (
-            f"Whisper Model: {self.model_spec.model_id} | Minimum RAM: {min_ram_gb}GB\n"
-            f"Whisper CLI: {whisper_binary}\n"
-            f"ffmpeg: {ffmpeg_binary}"
-        )
 
     def _build_ui(self):
         central = QtWidgets.QWidget()
@@ -731,11 +610,6 @@ class TranscriberWindow(QtWidgets.QMainWindow):
                 font-weight: 600;
                 color: #344054;
             }
-            QFrame#innerCard {
-                background: #ffffff;
-                border: 1px solid #dce2ea;
-                border-radius: 10px;
-            }
             QProgressBar {
                 border: 1px solid #d0d5dd;
                 border-radius: 8px;
@@ -750,15 +624,6 @@ class TranscriberWindow(QtWidgets.QMainWindow):
                     stop: 1 #1d4ed8
                 );
                 border-radius: 8px;
-            }
-            QPlainTextEdit {
-                background: #0f172a;
-                color: #e2e8f0;
-                border: 1px solid #1e293b;
-                border-radius: 10px;
-                padding: 8px;
-                font-family: "Menlo", "Consolas", monospace;
-                font-size: 12px;
             }
             """
         )
@@ -830,7 +695,7 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self._log_handler.setFormatter(formatter)
 
         root = logging.getLogger()
-        requested_level = os.environ.get("COACHLENS_LOG_LEVEL", "INFO").upper()
+        requested_level = os.environ.get("TALKTOTEXT_LOG_LEVEL", "INFO").upper()
         resolved_level = getattr(logging, requested_level, logging.INFO)
         root.setLevel(resolved_level)
         root.addHandler(self._log_handler)
@@ -1158,23 +1023,6 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         bar.setValue(visual)
         bar.setFormat(f"{visual}%")
 
-    def _remove_item(self, path: Path):
-        if self._processing:
-            return
-
-        row = self.rows.pop(path, None)
-        self.items.pop(path, None)
-        self.row_progress.pop(path, None)
-        self.row_visual_progress.pop(path, None)
-        if row:
-            index = self.list_widget.indexOfTopLevelItem(row)
-            if index >= 0:
-                self.list_widget.takeTopLevelItem(index)
-        self._update_empty_state()
-        self._update_overall(
-            0 if not self.items else self.completed_items, len(self.items)
-        )
-
     def _reveal_file(self, path: Path):
         target = path.parent if path.exists() else path
         self._open_in_default_app(target)
@@ -1242,7 +1090,6 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self.worker = Worker(
             pending_items,
             language="auto",
-            output_format="TXT",
             include_timestamps=True,
         )
         self.worker.itemStatus.connect(self._on_item_status)

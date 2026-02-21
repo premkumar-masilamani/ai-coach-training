@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import shutil
 import subprocess
 import tempfile
@@ -21,75 +22,16 @@ from transcriber.utils.model_selection import local_model_candidates
 from transcriber.utils.model_selection import min_ram_for_model
 from transcriber.utils.model_selection import repo_model_candidates
 from transcriber.utils.model_selection import select_model_for_hardware
-from transcriber.utils.time_util import format_timestamp
 
 logger = logging.getLogger(__name__)
+_RAW_WHISPER_LINE_RE = re.compile(
+    r"^\[\d{2}:\d{2}:\d{2}(?:[.,]\d+)?\s+-->\s+\d{2}:\d{2}:\d{2}(?:[.,]\d+)?\]\s+.+$"
+)
 
 
-def _parse_timestamp_to_seconds(raw: str) -> float:
-    text = raw.strip()
-    if not text:
-        return 0.0
-    text = text.replace(",", ".")
-    parts = text.split(":")
-    if len(parts) != 3:
-        return 0.0
-    hours = float(parts[0])
-    minutes = float(parts[1])
-    seconds = float(parts[2])
-    return (hours * 3600.0) + (minutes * 60.0) + seconds
-
-
-def _extract_segments(payload: dict) -> list[dict]:
-    segments = payload.get("transcription")
-    if not isinstance(segments, list):
-        segments = payload.get("segments")
-    if not isinstance(segments, list):
-        result = payload.get("result")
-        if isinstance(result, dict):
-            segments = result.get("segments")
-    if not isinstance(segments, list):
-        return []
-
-    lines = []
-    for segment in segments:
-        if not isinstance(segment, dict):
-            continue
-        text = str(segment.get("text", "")).strip()
-        if not text:
-            continue
-
-        start_raw = segment.get("start")
-        end_raw = segment.get("end")
-
-        if isinstance(start_raw, (int, float)) and isinstance(end_raw, (int, float)):
-            start_sec = float(start_raw)
-            end_sec = float(end_raw)
-        else:
-            offsets = segment.get("offsets", {})
-            if isinstance(offsets, dict):
-                from_ms = offsets.get("from")
-                to_ms = offsets.get("to")
-                if isinstance(from_ms, (int, float)) and isinstance(to_ms, (int, float)):
-                    start_sec = float(from_ms) / 1000.0
-                    end_sec = float(to_ms) / 1000.0
-                else:
-                    timestamps = segment.get("timestamps", {})
-                    start_sec = _parse_timestamp_to_seconds(str(timestamps.get("from", "")))
-                    end_sec = _parse_timestamp_to_seconds(str(timestamps.get("to", "")))
-            else:
-                start_sec = 0.0
-                end_sec = 0.0
-
-        lines.append(
-            {
-                "start": format_timestamp(start_sec),
-                "end": format_timestamp(end_sec),
-                "text": text,
-            }
-        )
-
-    return lines
+def _extract_raw_transcript(stdout_lines: list[str]) -> str:
+    raw_lines = [line for line in stdout_lines if _RAW_WHISPER_LINE_RE.match(line)]
+    return "\n".join(raw_lines).strip()
 
 
 class Transcriber:
@@ -397,19 +339,20 @@ class Transcriber:
                 logger.error("whisper.cpp did not produce JSON output for %s", audio_file)
                 return None
 
-            try:
-                payload = json.loads(json_output.read_text(encoding="utf-8"))
-            except Exception as exc:
-                logger.error("Failed to parse whisper.cpp JSON output for %s: %s", audio_file, exc)
-                return None
-
-            segments = _extract_segments(payload)
-            if not segments:
-                logger.warning("No segments found in whisper.cpp output for %s", audio_file)
+            raw_transcript = _extract_raw_transcript(stdout_lines)
+            if not raw_transcript:
+                logger.warning(
+                    "No raw transcript lines found in whisper.cpp output for %s",
+                    audio_file,
+                )
                 return None
 
         logger.info(
             "Transcription completed in %.2f seconds.",
             time.time() - start_transcribe,
         )
-        return json.dumps({"transcription": segments})
+        return json.dumps(
+            {
+                "raw_transcript": raw_transcript,
+            }
+        )

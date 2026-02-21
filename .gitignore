@@ -4,6 +4,7 @@
 # IDEs and editors
 .idea/
 .ropeproject/
+.ruff_cache/
 
 # ML/AI specific
 ai_models/
