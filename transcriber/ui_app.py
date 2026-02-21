@@ -20,7 +20,6 @@ from transcriber.utils.constants import (
     FFMPEG_PATH,
     WHISPER_CPP_LOCAL_BIN,
     WHISPER_CPP_LOCAL_LEGACY_BIN,
-    WHISPER_CPP_PATH,
 )
 from transcriber.utils.file_util import (
     is_preprocessed_whisper_audio,
@@ -446,25 +445,6 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self._setup_logging()
         self._start_initial_setup()
 
-    def _hardware_profile_text(self) -> str:
-        return (
-            f"OS: {self.hardware_profile.system} | "
-            f"Arch: {self.hardware_profile.architecture} | "
-            f"RAM: {self.hardware_profile.ram_gb}GB | "
-            f"CPU: {self.hardware_profile.cpu_cores} cores | "
-            f"Accelerator: {self.hardware_profile.accelerator}"
-        )
-
-    def _model_profile_text(self) -> str:
-        min_ram_gb = min_ram_for_model(self.model_spec.model_id)
-        whisper_binary = self._resolve_whisper_binary_for_profile()
-        ffmpeg_binary = self._resolve_ffmpeg_for_profile()
-        return (
-            f"Whisper Model: {self.model_spec.model_id} | Minimum RAM: {min_ram_gb}GB\n"
-            f"Whisper CLI: {whisper_binary}\n"
-            f"ffmpeg: {ffmpeg_binary}"
-        )
-
     def _build_ui(self):
         central = QtWidgets.QWidget()
         self.setCentralWidget(central)
@@ -731,11 +711,6 @@ class TranscriberWindow(QtWidgets.QMainWindow):
                 font-weight: 600;
                 color: #344054;
             }
-            QFrame#innerCard {
-                background: #ffffff;
-                border: 1px solid #dce2ea;
-                border-radius: 10px;
-            }
             QProgressBar {
                 border: 1px solid #d0d5dd;
                 border-radius: 8px;
@@ -750,15 +725,6 @@ class TranscriberWindow(QtWidgets.QMainWindow):
                     stop: 1 #1d4ed8
                 );
                 border-radius: 8px;
-            }
-            QPlainTextEdit {
-                background: #0f172a;
-                color: #e2e8f0;
-                border: 1px solid #1e293b;
-                border-radius: 10px;
-                padding: 8px;
-                font-family: "Menlo", "Consolas", monospace;
-                font-size: 12px;
             }
             """
         )
@@ -830,7 +796,7 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self._log_handler.setFormatter(formatter)
 
         root = logging.getLogger()
-        requested_level = os.environ.get("COACHLENS_LOG_LEVEL", "INFO").upper()
+        requested_level = os.environ.get("TALKTOTEXT_LOG_LEVEL", "INFO").upper()
         resolved_level = getattr(logging, requested_level, logging.INFO)
         root.setLevel(resolved_level)
         root.addHandler(self._log_handler)
@@ -1157,23 +1123,6 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         bar.setRange(0, 100)
         bar.setValue(visual)
         bar.setFormat(f"{visual}%")
-
-    def _remove_item(self, path: Path):
-        if self._processing:
-            return
-
-        row = self.rows.pop(path, None)
-        self.items.pop(path, None)
-        self.row_progress.pop(path, None)
-        self.row_visual_progress.pop(path, None)
-        if row:
-            index = self.list_widget.indexOfTopLevelItem(row)
-            if index >= 0:
-                self.list_widget.takeTopLevelItem(index)
-        self._update_empty_state()
-        self._update_overall(
-            0 if not self.items else self.completed_items, len(self.items)
-        )
 
     def _reveal_file(self, path: Path):
         target = path.parent if path.exists() else path

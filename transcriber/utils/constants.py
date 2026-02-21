@@ -3,34 +3,32 @@ import platform
 from pathlib import Path
 
 
-def _resolve_coachlens_home() -> Path:
+def _resolve_talktotext_home() -> Path:
     system = platform.system()
     home = Path.home()
 
     if system == "Windows":
         local_app_data = os.environ.get("LOCALAPPDATA")
         if local_app_data:
-            return Path(local_app_data) / "CoachLens"
-        return home / "AppData" / "Local" / "CoachLens"
+            return Path(local_app_data) / "TalkToText"
+        return home / "AppData" / "Local" / "TalkToText"
 
     if system == "Linux":
         xdg_data_home = os.environ.get("XDG_DATA_HOME")
         if xdg_data_home:
-            return Path(xdg_data_home) / "coachlens"
-        return home / ".local" / "share" / "coachlens"
+            return Path(xdg_data_home) / "talktotext"
+        return home / ".local" / "share" / "talktotext"
 
     # macOS default
-    return home / ".coachlens"
+    return home / ".talktotext"
 
 
-COACHLENS_HOME = _resolve_coachlens_home()
-AI_MODEL_PATH = COACHLENS_HOME / "models"
-TOOLS_PATH = COACHLENS_HOME / "tools"
-REPOS_PATH = COACHLENS_HOME / "repos"
+TALKTOTEXT_HOME = _resolve_talktotext_home()
+AI_MODEL_PATH = TALKTOTEXT_HOME / "models"
+TOOLS_PATH = TALKTOTEXT_HOME / "tools"
+REPOS_PATH = TALKTOTEXT_HOME / "repos"
 AI_MODEL_WHISPER_CPP_PATH = AI_MODEL_PATH / "whisper.cpp"
 WHISPER_CPP_MODEL_URL_PREFIX = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/"
-AI_MODEL_WHISPER_CPP_DEFAULT_MODEL = AI_MODEL_WHISPER_CPP_PATH / "ggml-base.en.bin"
-AI_MODEL_WHISPER_CPP_DEFAULT_MODEL_URL = f"{WHISPER_CPP_MODEL_URL_PREFIX}ggml-base.en.bin"
 FFMPEG_PATH = TOOLS_PATH / "ffmpeg"
 WHISPER_CPP_PATH = REPOS_PATH / "whisper.cpp"
 WHISPER_CPP_LOCAL_BIN = WHISPER_CPP_PATH / "build" / "bin" / (
