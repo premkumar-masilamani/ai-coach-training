@@ -147,7 +147,7 @@ def detect_hardware_profile() -> HardwareProfile:
     system = platform.system()
     architecture = platform.machine().lower()
     total_ram_bytes = _detect_total_ram_bytes(system)
-    ram_gb = max(1, int(total_ram_bytes / (1024**3)))
+    ram_gb = max(1, int(total_ram_bytes / (1024 ** 3)))
     cpu_cores = os.cpu_count() or 1
     accelerator = _detect_accelerator(system)
     ram_bucket = _ram_bucket(ram_gb)

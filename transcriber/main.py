@@ -1,5 +1,5 @@
-import logging
 import argparse
+import logging
 import sys
 from pathlib import Path
 
@@ -8,9 +8,11 @@ from transcriber.utils.constants import DEFAULT_INPUT_DIR
 
 logger = logging.getLogger()
 
+
 def main(input_dir: Path):
     pipeline = TranscriptionPipeline(input_dir)
     pipeline.run()
+
 
 if __name__ == "__main__":
     # --- Parse Arguments ---

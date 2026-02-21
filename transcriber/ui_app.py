@@ -203,11 +203,11 @@ class Worker(QtCore.QThread):
     allDone = QtCore.Signal()
 
     def __init__(
-        self,
-        items: list[Path],
-        language: str,
-        include_timestamps: bool,
-        parent=None,
+            self,
+            items: list[Path],
+            language: str,
+            include_timestamps: bool,
+            parent=None,
     ):
         super().__init__(parent)
         self.items = items
@@ -730,7 +730,7 @@ class TranscriberWindow(QtWidgets.QMainWindow):
 
     def _position_header_copy_button(self):
         if not hasattr(self, "header_card") or not hasattr(
-            self, "copy_diagnostics_btn"
+                self, "copy_diagnostics_btn"
         ):
             return
         x = self.header_card.width() - self.copy_diagnostics_btn.width() - 10
@@ -739,8 +739,8 @@ class TranscriberWindow(QtWidgets.QMainWindow):
 
     def eventFilter(self, obj, event):
         if (
-            obj is getattr(self, "header_card", None)
-            and event.type() == QtCore.QEvent.Resize
+                obj is getattr(self, "header_card", None)
+                and event.type() == QtCore.QEvent.Resize
         ):
             self._position_header_copy_button()
         return super().eventFilter(obj, event)
@@ -910,8 +910,8 @@ class TranscriberWindow(QtWidgets.QMainWindow):
             if path.is_dir():
                 for file_path in path.rglob("*"):
                     if (
-                        file_path.is_file()
-                        and file_path.suffix.lower() in supported_file_extensions
+                            file_path.is_file()
+                            and file_path.suffix.lower() in supported_file_extensions
                     ):
                         if self._is_intermediate_wav(file_path):
                             continue
@@ -1130,7 +1130,7 @@ class TranscriberWindow(QtWidgets.QMainWindow):
 
     @QtCore.Slot(Path, int, str, int, int)
     def _on_item_status(
-        self, path: Path, progress: int, status: str, index: int, total: int
+            self, path: Path, progress: int, status: str, index: int, total: int
     ):
         state = self.items.get(path)
         if state:
