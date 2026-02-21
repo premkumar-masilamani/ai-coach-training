@@ -1,0 +1,99 @@
+name: Build and Release Binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows-x64
+            binary_name: talk-to-text.exe
+            archive_name: talk-to-text-windows-x64.zip
+          - os: macos-13
+            target: macos-x64
+            binary_name: talk-to-text
+            archive_name: talk-to-text-macos-x64.zip
+          - os: macos-14
+            target: macos-arm64
+            binary_name: talk-to-text
+            archive_name: talk-to-text-macos-arm64.zip
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install PySide6 pyinstaller
+
+      - name: Build standalone UI binary
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed --name talk-to-text transcriber/ui_app.py
+
+      - name: Verify binary exists (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist/${{ matrix.binary_name }}")) {
+            throw "Expected binary dist/${{ matrix.binary_name }} was not generated."
+          }
+
+      - name: Verify binary exists (macOS)
+        if: runner.os != 'Windows'
+        run: test -f "dist/${{ matrix.binary_name }}"
+
+      - name: Package binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "dist/${{ matrix.binary_name }}" -DestinationPath "dist/${{ matrix.archive_name }}"
+
+      - name: Package binary (macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cd dist
+          zip -9 "${{ matrix.archive_name }}" "${{ matrix.binary_name }}"
+
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: dist/${{ matrix.archive_name }}
+
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Publish release and upload binaries
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/**/*.zip
+          generate_release_notes: true
+          overwrite_files: true

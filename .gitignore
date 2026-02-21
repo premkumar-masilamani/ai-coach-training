@@ -18,3 +18,8 @@ __pycache__/
 
 # Softwares
 tools/
+
+# Packaging outputs
+build/
+dist/
+*.spec
