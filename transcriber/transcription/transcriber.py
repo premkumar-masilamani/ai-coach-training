@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import shutil
 import subprocess
 import tempfile
@@ -24,6 +25,9 @@ from transcriber.utils.model_selection import select_model_for_hardware
 from transcriber.utils.time_util import format_timestamp
 
 logger = logging.getLogger(__name__)
+_RAW_WHISPER_LINE_RE = re.compile(
+    r"^\[\d{2}:\d{2}:\d{2}(?:[.,]\d+)?\s+-->\s+\d{2}:\d{2}:\d{2}(?:[.,]\d+)?\]\s+.+$"
+)
 
 
 def _parse_timestamp_to_seconds(raw: str) -> float:
@@ -90,6 +94,11 @@ def _extract_segments(payload: dict) -> list[dict]:
         )
 
     return lines
+
+
+def _extract_raw_transcript(stdout_lines: list[str]) -> str:
+    raw_lines = [line for line in stdout_lines if _RAW_WHISPER_LINE_RE.match(line)]
+    return "\n".join(raw_lines).strip()
 
 
 class Transcriber:
@@ -408,8 +417,15 @@ class Transcriber:
                 logger.warning("No segments found in whisper.cpp output for %s", audio_file)
                 return None
 
+            raw_transcript = _extract_raw_transcript(stdout_lines)
+
         logger.info(
             "Transcription completed in %.2f seconds.",
             time.time() - start_transcribe,
         )
-        return json.dumps({"transcription": segments})
+        return json.dumps(
+            {
+                "transcription": segments,
+                "raw_transcript": raw_transcript,
+            }
+        )

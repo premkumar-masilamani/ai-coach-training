@@ -232,7 +232,9 @@ class Worker(QtCore.QThread):
             if self.include_timestamps:
                 start = self._segment_time_to_seconds(segment.get("start", 0.0))
                 end = self._segment_time_to_seconds(segment.get("end", 0.0))
-                lines.append(f"{start:.2f} - {end:.2f} | {text}")
+                start_text = self._seconds_to_human_time(start)
+                end_text = self._seconds_to_human_time(end)
+                lines.append(f"{start_text} - {end_text} | {text}")
             else:
                 lines.append(text)
         return "\n".join(lines).strip()
@@ -269,9 +271,25 @@ class Worker(QtCore.QThread):
         except ValueError:
             return 0.0
 
+    @staticmethod
+    def _seconds_to_human_time(value: float) -> str:
+        total_ms = max(0, int(round(value * 1000)))
+        hours = total_ms // 3600000
+        minutes = (total_ms % 3600000) // 60000
+        seconds = (total_ms % 60000) // 1000
+        millis = total_ms % 1000
+        if millis:
+            return f"{hours:02}:{minutes:02}:{seconds:02}.{millis:03}"
+        return f"{hours:02}:{minutes:02}:{seconds:02}"
+
     def _save_transcript_output(self, transcript_path: Path, transcribed_json: str):
-        segments = self._extract_segments(transcribed_json)
-        text_content = self._build_plain_text(segments)
+        payload = json.loads(transcribed_json)
+        raw_transcript = str(payload.get("raw_transcript", "")).strip()
+        if raw_transcript:
+            text_content = raw_transcript
+        else:
+            segments = self._extract_segments(transcribed_json)
+            text_content = self._build_plain_text(segments)
         self._save_txt(transcript_path, text_content)
 
     def run(self):
