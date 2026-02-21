@@ -4,15 +4,6 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-torch = "*"
-"pyannote.audio" = "*"
-huggingface-hub = "*"
-pydub = "*"
-pipeline = "*"
-langchain = "*"
-langchain-google-genai = "*"
-langchain-core = "*"
-llm = "*"
 PySide6 = "*"
 
 [dev-packages]

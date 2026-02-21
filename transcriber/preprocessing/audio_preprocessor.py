@@ -36,7 +36,7 @@ def preprocessed_output_path(audio_file: Path) -> Path:
 
 
 def prepare_audio_for_transcription(
-    audio_file: Path, stop_event: Optional[Event] = None
+        audio_file: Path, stop_event: Optional[Event] = None
 ) -> Path:
     source_audio = preferred_wav_input(audio_file)
     if source_audio != audio_file:

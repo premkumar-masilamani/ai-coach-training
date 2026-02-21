@@ -233,10 +233,10 @@ class Transcriber:
         self._report("tool.binary", "Ready", str(WHISPER_CPP_LOCAL_BIN))
 
     def _download_model(
-        self,
-        destination: Path,
-        source_url: str,
-        model_id: str,
+            self,
+            destination: Path,
+            source_url: str,
+            model_id: str,
     ) -> bool:
         destination.parent.mkdir(parents=True, exist_ok=True)
         temp_path = destination.with_suffix(destination.suffix + ".tmp")
