@@ -229,7 +229,7 @@ class SetupWorker(QtCore.QThread):
 
 
 class TranscriberWindow(QtWidgets.QMainWindow):
-    ITEMS_HEADERS = ("Audio File", "Status", "Transcript File")
+    ITEMS_HEADERS = ("Audio File", "Transcript File", "Status")
     SETUP_HEADERS = ("Component", "Status", "Location")
 
     def __init__(self):
@@ -357,6 +357,10 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self.list_widget.setAlternatingRowColors(True)
         self.list_widget.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.list_widget.itemClicked.connect(self._on_list_item_clicked)
+        header = self.list_widget.header()
+        header.setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)
         layout.addWidget(self.list_widget, 1)
 
         self.system_info_card = QtWidgets.QFrame()
@@ -461,6 +465,10 @@ class TranscriberWindow(QtWidgets.QMainWindow):
                 border: 1px solid #e0e0e0;
                 border-radius: 10px;
                 color: #161616;
+            }
+            QTreeWidget::item {
+                padding-top: 6px;
+                padding-bottom: 6px;
             }
             QHeaderView::section {
                 background: #f0f0f0;
@@ -575,6 +583,7 @@ class TranscriberWindow(QtWidgets.QMainWindow):
     def _add_setup_row(self, item_id: str, path_text: str):
         item = QtWidgets.QTreeWidgetItem([item_id, "Queued", path_text])
         self.list_widget.addTopLevelItem(item)
+        self._apply_row_padding(item)
         self._setup_rows[item_id] = item
 
     @QtCore.Slot(str, str, str)
@@ -592,6 +601,10 @@ class TranscriberWindow(QtWidgets.QMainWindow):
             self._setup_rows.clear()
             self.list_label.setText("Items")
             self.list_widget.setHeaderLabels(list(self.ITEMS_HEADERS))
+            header = self.list_widget.header()
+            header.setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
+            header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
+            header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)
             self.drop_area.setEnabled(True)
             self._set_controls_enabled(True)
             logger.info("First-run setup complete. You can now add files.")
@@ -637,7 +650,8 @@ class TranscriberWindow(QtWidgets.QMainWindow):
     def _add_paths(self, paths: list[Path]):
         if self.setup_in_progress:
             return
-        added = 0
+        added_files: list[Path] = []
+        skipped_existing: list[Path] = []
         for path in paths:
             if path.is_dir():
                 for file_path in path.rglob("*"):
@@ -647,29 +661,56 @@ class TranscriberWindow(QtWidgets.QMainWindow):
                     ):
                         if has_original_pair_for_preprocessed(file_path):
                             continue
-                        added += self._add_item(file_path)
+                        if file_path in self.items:
+                            skipped_existing.append(file_path)
+                            continue
+                        if self._add_item(file_path):
+                            added_files.append(file_path)
             elif path.is_file():
                 if path.suffix.lower() in audio_extensions:
                     if has_original_pair_for_preprocessed(path):
                         continue
-                    added += self._add_item(path)
+                    if path in self.items:
+                        skipped_existing.append(path)
+                        continue
+                    if self._add_item(path):
+                        added_files.append(path)
 
-        if added == 0:
+        if added_files or skipped_existing:
+            added_unique = list(dict.fromkeys(added_files))
+            skipped_unique = list(dict.fromkeys(skipped_existing))
+            message_lines: list[str] = []
+            if added_unique:
+                message_lines.append(f"Added ({len(added_unique)}):")
+                message_lines.extend(f"- {file.name}" for file in added_unique)
+            if skipped_unique:
+                if message_lines:
+                    message_lines.append("")
+                message_lines.append(f"Skipped already in list ({len(skipped_unique)}):")
+                message_lines.extend(f"- {file.name}" for file in skipped_unique)
             QtWidgets.QMessageBox.information(
-                self, "No audio files", "No supported audio files were found."
+                self,
+                "Files processed",
+                "\n".join(message_lines),
+            )
+            return
+
+        if paths:
+            QtWidgets.QMessageBox.information(
+                self,
+                "No audio files",
+                "No supported audio files were found.",
             )
 
     def _add_item(self, path: Path) -> int:
         if path in self.items:
             return 0
         state = ItemState(path=path, progress=0, status="Queued")
-        transcript_path = transcript_path_for_audio(path)
-        row = QtWidgets.QTreeWidgetItem(
-            [str(path), state.status, str(transcript_path)]
-        )
+        row = QtWidgets.QTreeWidgetItem([path.name, "", state.status])
+        row.setData(0, QtCore.Qt.UserRole, str(path))
+        self._set_transcript_cell(row, path)
         self.list_widget.addTopLevelItem(row)
-        self._style_clickable_cell(row, 0)
-        self._style_clickable_cell(row, 2)
+        self._apply_row_padding(row)
         self.items[path] = state
         self.rows[path] = row
         return 1
@@ -738,7 +779,8 @@ class TranscriberWindow(QtWidgets.QMainWindow):
             state.status = status
         row = self.rows.get(path)
         if row:
-            row.setText(1, f"{status} ({progress}%)")
+            self._set_transcript_cell(row, path)
+            row.setText(2, f"{status} ({progress}%)")
         logger.debug("Item status: %s progress=%s status=%s", path, progress, status)
 
     @QtCore.Slot(Path)
@@ -781,9 +823,9 @@ class TranscriberWindow(QtWidgets.QMainWindow):
     def _on_list_item_clicked(self, item: QtWidgets.QTreeWidgetItem, column: int):
         if self.setup_in_progress:
             return
-        if column not in {0, 2}:
+        if column not in {0, 1}:
             return
-        raw = item.text(column).strip()
+        raw = item.data(column, QtCore.Qt.UserRole)
         if not raw:
             return
         self._open_in_default_app(Path(raw))
@@ -795,11 +837,20 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         url = QtCore.QUrl.fromLocalFile(str(path))
         QtGui.QDesktopServices.openUrl(url)
 
-    def _style_clickable_cell(self, item: QtWidgets.QTreeWidgetItem, column: int):
-        item.setForeground(column, QtGui.QBrush(QtGui.QColor("#0a58ca")))
-        font = item.font(column)
-        font.setUnderline(True)
-        item.setFont(column, font)
+    def _apply_row_padding(self, item: QtWidgets.QTreeWidgetItem):
+        size = QtCore.QSize(0, 30)
+        item.setSizeHint(0, size)
+        item.setSizeHint(1, size)
+        item.setSizeHint(2, size)
+
+    def _set_transcript_cell(self, item: QtWidgets.QTreeWidgetItem, audio_path: Path):
+        transcript_path = transcript_path_for_audio(audio_path)
+        if transcript_path.exists():
+            item.setText(1, transcript_path.name)
+            item.setData(1, QtCore.Qt.UserRole, str(transcript_path))
+            return
+        item.setText(1, "Pending (to be created)")
+        item.setData(1, QtCore.Qt.UserRole, None)
 
     def closeEvent(self, event):
         if self.setup_worker and self.setup_worker.isRunning():
