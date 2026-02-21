@@ -5,24 +5,73 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # --- Supported audio/video extensions ---
-audio_extensions = {
+supported_file_extensions = {
+    # Audio
     ".aac",
+    ".ac3",
+    ".aif",
+    ".aifc",
     ".aiff",
     ".alac",
+    ".amr",
+    ".ape",
+    ".au",
+    ".caf",
+    ".dts",
+    ".eac3",
     ".flac",
+    ".gsm",
     ".m4a",
+    ".m4b",
+    ".m4p",
+    ".mid",
+    ".midi",
+    ".mod",
+    ".mp2",
     ".mp3",
+    ".mpa",
+    ".mpc",
+    ".oga",
     ".ogg",
     ".opus",
+    ".ra",
+    ".ram",
+    ".s3m",
+    ".spx",
+    ".tak",
+    ".tta",
+    ".voc",
     ".wav",
+    ".weba",
     ".wma",
+    ".wv",
+    ".xm",
+    # Video / containers with audio tracks
+    ".3g2",
+    ".3gp",
+    ".asf",
     ".avi",
+    ".divx",
+    ".f4v",
+    ".flv",
+    ".m2ts",
+    ".m2v",
     ".m4v",
     ".mkv",
     ".mov",
     ".mp4",
+    ".mpe",
     ".mpeg",
     ".mpg",
+    ".mts",
+    ".mxf",
+    ".ogm",
+    ".ogv",
+    ".qt",
+    ".rm",
+    ".rmvb",
+    ".ts",
+    ".vob",
     ".webm",
     ".wmv",
 }
@@ -37,7 +86,7 @@ def has_original_pair_for_preprocessed(file: Path) -> bool:
         return False
 
     base_stem = file.stem[: -len(".whisper")]
-    for ext in audio_extensions:
+    for ext in supported_file_extensions:
         candidate = file.with_name(f"{base_stem}{ext}")
         if candidate != file and candidate.exists():
             return True
@@ -56,7 +105,7 @@ def load_audio_files(folder_path: Path):
     pending_files = []
     seen_transcripts: set[Path] = set()
     for file in folder_path.rglob("*"):
-        if file.suffix.lower() in audio_extensions and file.is_file():
+        if file.suffix.lower() in supported_file_extensions and file.is_file():
             if has_original_pair_for_preprocessed(file):
                 logger.debug(
                     "Skipping paired preprocessed file: %s (original exists)",
