@@ -5,10 +5,8 @@ import platform
 import shutil
 import sys
 import threading
-import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from xml.sax.saxutils import escape
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
@@ -208,14 +206,12 @@ class Worker(QtCore.QThread):
         self,
         items: list[Path],
         language: str,
-        output_format: str,
         include_timestamps: bool,
         parent=None,
     ):
         super().__init__(parent)
         self.items = items
         self.language = language
-        self.output_format = output_format
         self.include_timestamps = include_timestamps
         self._stop_event = threading.Event()
 
@@ -234,8 +230,8 @@ class Worker(QtCore.QThread):
             if not text:
                 continue
             if self.include_timestamps:
-                start = float(segment.get("start", 0.0))
-                end = float(segment.get("end", 0.0))
+                start = self._segment_time_to_seconds(segment.get("start", 0.0))
+                end = self._segment_time_to_seconds(segment.get("end", 0.0))
                 lines.append(f"{start:.2f} - {end:.2f} | {text}")
             else:
                 lines.append(text)
@@ -245,89 +241,38 @@ class Worker(QtCore.QThread):
         with open(transcript_path, "w", encoding="utf-8") as handle:
             handle.write(text_content)
 
-    def _save_srt(self, transcript_path: Path, segments: list[dict]):
-        srt_path = transcript_path.with_suffix(".srt")
-
-        lines: list[str] = []
-        for index, segment in enumerate(segments, start=1):
-            start = float(segment.get("start", 0.0))
-            end = float(segment.get("end", 0.0))
-            text = str(segment.get("text", "")).strip()
-            if not text:
-                continue
-            lines.append(str(index))
-            lines.append(f"{self._to_srt_time(start)} --> {self._to_srt_time(end)}")
-            lines.append(text)
-            lines.append("")
-
-        with open(srt_path, "w", encoding="utf-8") as handle:
-            handle.write("\n".join(lines))
-
     @staticmethod
-    def _to_srt_time(value: float) -> str:
-        total_ms = max(0, int(value * 1000))
-        hours = total_ms // 3600000
-        minutes = (total_ms % 3600000) // 60000
-        seconds = (total_ms % 60000) // 1000
-        millis = total_ms % 1000
-        return f"{hours:02}:{minutes:02}:{seconds:02},{millis:03}"
+    def _segment_time_to_seconds(value) -> float:
+        if isinstance(value, (int, float)):
+            return float(value)
 
-    def _save_pdf(self, transcript_path: Path, text_content: str):
-        pdf_path = transcript_path.with_suffix(".pdf")
-        writer = QtGui.QPdfWriter(str(pdf_path))
-        writer.setPageSize(QtGui.QPageSize(QtGui.QPageSize.A4))
-        writer.setResolution(96)
-        doc = QtGui.QTextDocument()
-        doc.setDefaultFont(QtGui.QFont("Helvetica", 11))
-        doc.setPlainText(text_content)
-        doc.print_(writer)
+        text = str(value or "").strip()
+        if not text:
+            return 0.0
 
-    def _save_docx(self, transcript_path: Path, text_content: str):
-        docx_path = transcript_path.with_suffix(".docx")
-        content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-<Default Extension="xml" ContentType="application/xml"/>
-<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-</Types>"""
-        rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>"""
-        document_rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"""
-        paragraphs = []
-        for line in text_content.splitlines():
-            paragraphs.append(
-                f'<w:p><w:r><w:t xml:space="preserve">{escape(line)}</w:t></w:r></w:p>'
-            )
-        if not paragraphs:
-            paragraphs = ["<w:p/>"]
-        document_xml = (
-            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-<w:body>"""
-            + "".join(paragraphs)
-            + """<w:sectPr/></w:body></w:document>"""
-        )
-        with zipfile.ZipFile(docx_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr("[Content_Types].xml", content_types)
-            zf.writestr("_rels/.rels", rels)
-            zf.writestr("word/document.xml", document_xml)
-            zf.writestr("word/_rels/document.xml.rels", document_rels)
+        # Accept HH:MM:SS(.mmm) and HH:MM:SS,mmm values.
+        text = text.replace(",", ".")
+        if ":" in text:
+            parts = text.split(":")
+            if len(parts) == 3:
+                try:
+                    hours = float(parts[0])
+                    minutes = float(parts[1])
+                    seconds = float(parts[2])
+                    return (hours * 3600.0) + (minutes * 60.0) + seconds
+                except ValueError:
+                    return 0.0
+            return 0.0
 
-    def _save_selected_output(self, transcript_path: Path, transcribed_json: str):
+        try:
+            return float(text)
+        except ValueError:
+            return 0.0
+
+    def _save_transcript_output(self, transcript_path: Path, transcribed_json: str):
         segments = self._extract_segments(transcribed_json)
         text_content = self._build_plain_text(segments)
         self._save_txt(transcript_path, text_content)
-
-        selected = self.output_format.upper().strip()
-        if selected == "SRT":
-            self._save_srt(transcript_path, segments)
-        elif selected == "PDF":
-            self._save_pdf(transcript_path, text_content)
-        elif selected == "DOCX":
-            self._save_docx(transcript_path, text_content)
 
     def run(self):
         transcriber = Transcriber()
@@ -367,7 +312,7 @@ class Worker(QtCore.QThread):
                 )
                 if transcribed_json:
                     self.itemStatus.emit(path, 90, "Saving", index, total)
-                    self._save_selected_output(transcript_path, transcribed_json)
+                    self._save_transcript_output(transcript_path, transcribed_json)
                     logger.info("Transcript saved: %s", transcript_path)
                     self.itemStatus.emit(path, 100, "Done", index, total)
                 else:
@@ -1191,7 +1136,6 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         self.worker = Worker(
             pending_items,
             language="auto",
-            output_format="TXT",
             include_timestamps=True,
         )
         self.worker.itemStatus.connect(self._on_item_status)
