@@ -1279,6 +1279,17 @@ class TranscriberWindow(QtWidgets.QMainWindow):
         super().closeEvent(event)
 
 
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+
 def main():
     app = QtWidgets.QApplication(sys.argv)
     app.setStyle("Fusion")
@@ -1292,10 +1303,20 @@ def main():
     palette.setColor(QtGui.QPalette.ToolTipText, QtGui.QColor("#1f2937"))
     app.setPalette(palette)
 
+    icon_path = resource_path(os.path.join("files", "talk-to-text-icon.png"))
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QtGui.QIcon(icon_path))
+
     window = TranscriberWindow()
     window.show()
     sys.exit(app.exec())
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"CRITICAL ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        input("Press Enter to exit...")

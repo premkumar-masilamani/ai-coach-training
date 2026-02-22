@@ -19,14 +19,17 @@ jobs:
         include:
           - os: windows-latest
             target: windows-x64
+            architecture: x64
             binary_name: talk-to-text.exe
             archive_name: talk-to-text-windows-x64.zip
-          - os: macos-13
+          - os: macos-14
             target: macos-x64
+            architecture: x64
             binary_name: talk-to-text
             archive_name: talk-to-text-macos-x64.zip
           - os: macos-14
             target: macos-arm64
+            architecture: arm64
             binary_name: talk-to-text
             archive_name: talk-to-text-macos-arm64.zip
 
@@ -38,6 +41,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+          architecture: ${{ matrix.architecture }}
           cache: "pipenv"
 
       - name: Install build dependencies
@@ -48,8 +52,17 @@ jobs:
           pip install pyinstaller
 
       - name: Build standalone UI binary
+        shell: bash
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name talk-to-text transcriber/ui_app.py
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            SEP=";"
+          else
+            SEP=":"
+          fi
+          pyinstaller --noconfirm --clean --onefile --windowed --name talk-to-text \
+            --add-data "files/talk-to-text-icon.png${SEP}files" \
+            --icon "files/talk-to-text-icon.png" \
+            transcriber/ui_app.py
 
       - name: Verify binary exists (Windows)
         if: runner.os == 'Windows'
