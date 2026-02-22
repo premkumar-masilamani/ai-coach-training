@@ -52,8 +52,17 @@ jobs:
           pip install pyinstaller
 
       - name: Build standalone UI binary
+        shell: bash
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name talk-to-text transcriber/ui_app.py
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            SEP=";"
+          else
+            SEP=":"
+          fi
+          pyinstaller --noconfirm --clean --onefile --windowed --name talk-to-text \
+            --add-data "files/talk-to-text-icon.png${SEP}files" \
+            --icon "files/talk-to-text-icon.png" \
+            transcriber/ui_app.py
 
       - name: Verify binary exists (Windows)
         if: runner.os == 'Windows'
